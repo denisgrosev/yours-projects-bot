@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    restart: always
+    environment:
+      # Переменные окружения для бота, если нужны
+    volumes:
+      - .:/app
+  webhook:
+    build:
+      context: .
+      dockerfile: Dockerfile.webhook
+    restart: always
+    environment:
+      # Переменные окружения для webhook, если нужны
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
