@@ -4,10 +4,11 @@ import logging
 import asyncio
 import re
 import shutil
+import subprocess
 from datetime import datetime
 from docx.shared import Pt, Cm
 from docx.enum.text import WD_BREAK
-from docx2pdf import convert
+from libreoffice_converter import convert
 import pdfplumber
 from telegram import ReplyKeyboardMarkup
 from docx import Document
@@ -650,6 +651,19 @@ def add_contents_page(doc, points):
         run.font.name = "Times New Roman"
         p.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
         p.paragraph_format.line_spacing = 1.5
+
+def convert(input_path, output_path=None):
+    output_dir = os.path.dirname(output_path) if output_path else os.path.dirname(input_path)
+    subprocess.run([
+        "libreoffice", "--headless", "--convert-to", "pdf",
+        "--outdir", output_dir, input_path
+    ], check=True)
+
+    if output_path:
+        base = os.path.splitext(os.path.basename(input_path))[0]
+        generated_pdf = os.path.join(output_dir, base + ".pdf")
+        if os.path.abspath(generated_pdf) != os.path.abspath(output_path):
+            os.replace(generated_pdf, output_path)
 
 def add_page_numbers(doc, points, temp_docx_path="_temp_toc.docx", temp_pdf_path="_temp_toc.pdf"):
     doc.save(temp_docx_path)
