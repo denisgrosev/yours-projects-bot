@@ -1,7 +1,8 @@
 import os
 import json
 
-BALANCE_FILE = "user_balances.json"
+# Жёстко задаём путь к файлу в нужной папке
+BALANCE_FILE = "/app/data/files212/user_balances.json"
 
 def load_balances():
     if os.path.exists(BALANCE_FILE):
@@ -16,6 +17,8 @@ def get_referrer_id(user_id):
     return user.get("referrer_id") if user else None
 
 def save_balances(balances):
+    # Гарантируем, что папка существует
+    os.makedirs(os.path.dirname(BALANCE_FILE), exist_ok=True)
     with open(BALANCE_FILE, "w", encoding="utf-8") as f:
         json.dump(balances, f, ensure_ascii=False, indent=2)
 
