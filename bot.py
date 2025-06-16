@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 import logging
 import asyncio
 import re
 import shutil
+import subprocess
 from datetime import datetime
 from docx.shared import Pt, Cm
 from docx.enum.text import WD_BREAK
@@ -594,219 +596,10 @@ def is_valid_email(email):
 def is_bold(fontname):
     return any(word in fontname.lower() for word in ["bold", "bd", "black", "heavy", "semibold"])
 
-def strip_leading_number(text):
-    return re.sub(r"^\d+\.\s*", "", text)
-
 def create_project_directory():
     if not os.path.exists(PROJECTS_PATH):
         os.makedirs(PROJECTS_PATH)
         logger.info("Создана папка projects")
-
-def sanitize_filename(text):
-    forbidden_chars = '/\\:*?"<>|'
-    for char in forbidden_chars:
-        text = text.replace(char, '_')
-    return text.strip()
-
-def fix_fonts(doc):
-    for paragraph in doc.paragraphs:
-        for run in paragraph.runs:
-            run.font.size = Pt(14)
-            run.font.name = "Times New Roman"
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    for run in paragraph.runs:
-                        run.font.size = Pt(14)
-                        run.font.name = "Times New Roman"
-
-def remove_asterisks(doc):
-    for paragraph in doc.paragraphs:
-        for run in paragraph.runs:
-            run.text = run.text.replace("*", "")
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    for run in paragraph.runs:
-                        run.text = run.text.replace("*", "")
-
-def add_contents_page(doc, points):
-    p_title = doc.add_paragraph()
-    run = p_title.add_run("Содержание")
-    run.bold = True
-    run.font.size = Pt(14)
-    run.font.name = "Times New Roman"
-    p_title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    p_title.paragraph_format.line_spacing = 1.5
-    for idx, point in enumerate(points, 1):
-        p = doc.add_paragraph()
-        p.paragraph_format.tab_stops.add_tab_stop(
-            Cm(18.5), alignment=WD_TAB_ALIGNMENT.RIGHT, leader=WD_TAB_LEADER.DOTS
-        )
-        run = p.add_run(f"{idx}. {strip_leading_number(point).strip().rstrip('.')}\t")
-        run.font.size = Pt(14)
-        run.font.name = "Times New Roman"
-        p.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
-        p.paragraph_format.line_spacing = 1.5
-
-
-def add_page_numbers(doc, points, temp_docx_path="_temp_toc.docx", temp_pdf_path="_temp_toc.pdf"):
-    doc.save(temp_docx_path)
-    convert(temp_docx_path, temp_pdf_path)
-    pages_dict = {}
-    with pdfplumber.open(temp_pdf_path) as pdf:
-        for point in points:
-            title = strip_leading_number(point).strip().rstrip('.')
-            normalized_title = " ".join(title.split()).lower()
-            pages_dict[point] = None
-            for i, page in enumerate(pdf.pages):
-                if i < 2:
-                    continue
-                words = page.extract_words(extra_attrs=["fontname"])
-                page_text = " ".join(w["text"] for w in words if is_bold(w.get("fontname", ""))).lower()
-                normalized_page_text = re.sub(r"\s+", " ", page_text)
-                if normalized_title in normalized_page_text:
-                    pages_dict[point] = i + 1
-                    break
-            if pages_dict[point] is None:
-                logger.warning(f"⚠️ Не найден заголовок: '{title}'")
-    for paragraph in doc.paragraphs:
-        for idx, point in enumerate(points, 1):
-            clean_label = f"{idx}. {strip_leading_number(point).strip().rstrip('.')}"
-            if paragraph.text.startswith(clean_label):
-                page = pages_dict.get(point)
-                if page:
-                    parts = paragraph.text.split('\t')
-                    left = parts[0]
-                    paragraph.clear()
-                    run = paragraph.add_run(f"{left}\t{page}")
-                    run.font.size = Pt(14)
-                    run.font.name = "Times New Roman"
-    for path in (temp_docx_path, temp_pdf_path):
-        if os.path.exists(path):
-            os.remove(path)
-
-def insert_page_break(paragraph):
-    run = paragraph.insert_paragraph_before().add_run()
-    run.add_break(WD_BREAK.PAGE)
-
-def insert_page_break_after(paragraph):
-    run = paragraph.add_run()
-    run.add_break(WD_BREAK.PAGE)
-
-def insert_page_break_after_last_content(doc, points):
-    last_point_idx = None
-    for idx, paragraph in enumerate(doc.paragraphs):
-        expected = f"{len(points)}."
-        if paragraph.text.strip().startswith(expected):
-            last_point_idx = idx
-    if last_point_idx is not None:
-        insert_page_break_after(doc.paragraphs[last_point_idx])
-
-def add_page_breaks_around_contents(doc, points):
-    contents_idx = None
-    for idx, paragraph in enumerate(doc.paragraphs):
-        if paragraph.text.strip() == "Содержание":
-            contents_idx = idx
-            break
-    if contents_idx is not None:
-        insert_page_break(doc.paragraphs[contents_idx])
-    last_point_idx = None
-    for idx, paragraph in enumerate(doc.paragraphs):
-        for i, point in enumerate(points, 1):
-            expected = f"{i}. {strip_leading_number(point).strip().rstrip('.')}"
-            if paragraph.text.strip().startswith(expected):
-                last_point_idx = idx
-    if last_point_idx is not None:
-        insert_page_break_after(doc.paragraphs[last_point_idx])
-
-def build_replacements(user_data):
-    group = user_data['group']
-    course = group[0] if group and group[0].isdigit() else ""
-    spec_number = user_data.get('spec_number')
-    spec_name = user_data.get('spec_name')
-    if not spec_number or not spec_name:
-        spec_number, spec_name = get_spec_by_group(group)
-    return {
-        "<<FIO>>": user_data['fio_student'],
-        "<<THEME>>": user_data['topic'],
-        "<<SUBJECT>>": user_data['subject'],
-        "<<GROUP>>": group,
-        "<<TEACHER>>": user_data['fio_teacher'],
-        "<<COURSE>>": course,
-        "<<SPECNUM>>": spec_number,
-        "<<SPECTEXT>>": spec_name,
-    }
-
-def replace_placeholders_in_docx(doc, replacements):
-    for paragraph in doc.paragraphs:
-        for placeholder, value in replacements.items():
-            if placeholder in paragraph.text:
-                paragraph.text = paragraph.text.replace(placeholder, value)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for placeholder, value in replacements.items():
-                    if placeholder in cell.text:
-                        cell.text = cell.text.replace(placeholder, value)
-
-def create_project_docx(primer_doc_path, output_dir, fio_student, theme, timestamp, replacements):
-    safe_fio = sanitize_filename(fio_student)
-    safe_theme = sanitize_filename(theme)
-    output_file = os.path.join(output_dir, f"{safe_fio}. {safe_theme}.{timestamp}.docx")
-    shutil.copy(primer_doc_path, output_file)
-    doc = Document(output_file)
-    replace_placeholders_in_docx(doc, replacements)
-    fix_fonts(doc)
-    doc.save(output_file)
-    return output_file
-
-def extract_clean_content(raw_text):
-    logger.info("Обрабатываем текст...")
-    list_items = re.findall(r'(?:\d+\.?|\-|\•)\s*.+', raw_text)
-    if list_items:
-        logger.info("Обнаружен список")
-        return '\n'.join([item.strip() for item in list_items])
-    return raw_text.strip()
-
-def send_deepseek_request(prompt, temperature=0.7, max_tokens=7000):
-    data = {
-        "model": "deepseek-chat",
-        "messages": [
-            {"role": "system", "content": "Отвечай только на русском языке. Четко следуй всем инструкциям."},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-    }
-    import requests
-    try:
-        response = requests.post(DEEPSEEK_API_URL, json=data, headers=HEADERS)
-        response.raise_for_status()
-        return response.json()['choices'][0]['message']['content']
-    except Exception as e:
-        logger.error(f"Ошибка API: {e}")
-        raise
-
-async def send_deepseek_request_with_retry(prompt, temperature=0.7, max_tokens=7000, retries=3, delay=5):
-    for attempt in range(1, retries + 1):
-        try:
-            response = send_deepseek_request(prompt, temperature, max_tokens)
-            return response
-        except Exception as e:
-            error_text = str(e)
-            logger.error(f"Попытка {attempt}: Ошибка API: {error_text}")
-            if "Response ended prematurely" in error_text or "Connection" in error_text or "timed out" in error_text:
-                if attempt < retries:
-                    logger.info(f"Повтор через {delay} секунд...")
-                    await asyncio.sleep(delay)
-                else:
-                    logger.error("Все попытки исчерпаны, запрос не удался.")
-                    raise
-            else:
-                raise
 
 async def safe_send_message(bot, chat_id, *args, **kwargs):
     for i in range(20):
@@ -1010,92 +803,31 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             f"С вашего баланса списано {price}₽. Остаток: {get_user_balance(user_id)}₽.\nГенерация проекта начата!",
             reply_markup=BACK_TO_MENU_BTN
         )
-        await generate_project(update, context)
+
+        # --- ЭТОТ КУСОК ВСТАВИТЬ ---
+        # Путь до скрипта генерации
+        generator_path = os.path.join(os.path.dirname(__file__), "generate_project_process.py")
+        subprocess.Popen([
+            sys.executable, generator_path,
+            "--token", "7819985767:AAG130I3AVmnskfJOSL95q7yga69VMiyeDU",
+            "--user_id", str(user_id),
+            "--fio_student", context.user_data.get('fio_student', ''),
+            "--topic", context.user_data.get('topic', ''),
+            "--subject", context.user_data.get('subject', ''),
+            "--group", context.user_data.get('group', ''),
+            "--fio_teacher", context.user_data.get('fio_teacher', ''),
+            "--num_points", str(context.user_data.get('num_points', 1)),
+            "--spec_number", context.user_data.get('spec_number', ''),
+            "--spec_name", context.user_data.get('spec_name', ''),
+            "--primer_path", os.path.join(PROJECTS_PATH, "primer.docx"),
+            "--output_dir", PROJECTS_PATH,
+            "--deepseek_api_key", "sk-813cf716149d4404a3eb37cd6933096f",
+            "--admin_id", str(ADMIN_ID),
+        ])
+        # --- КОНЕЦ ВСТАВКИ ---
+
         return ConversationHandler.END
 
-async def generate_project(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user_data = context.user_data
-    await safe_send_and_store(context, user_id, "Генерируем пункты содержания...")
-    topic = user_data['topic']
-    subject = user_data['subject']
-    num_points = user_data['num_points']
-    content_prompt = (
-        f"""Привет, я пишу проект по теме: {topic}, по предмету: {subject}.
-        Составь нумерованный список из {num_points} уникальных, содержательных пунктов для содержания этого проекта. В них не должно быть много текста, чтобы они поместились в содержание, в идеале около трех слов.
-        Не добавляй подпунктов, пояснений, заголовков или инструкций — только сами пункты списка.
-        Первый пункт должен быть по теме проекта, а не повторять формулировку задания.
-        Не используй пункты типа "Введение", "Заключение", "Список литературы", "{num_points} пунктов содержания" и тому подобное.
-        Каждый пункт должен отражать отдельный аспект или раздел по теме.
-        Оформи исключительно в виде нумерованного списка, без лишнего текста до и после."""
-    )
-    raw_content = await send_deepseek_request_with_retry(content_prompt)
-    await safe_send_and_store(context, user_id, "Обрабатываем текст...")
-
-    clean_content = extract_clean_content(raw_content)
-    await safe_send_and_store(context, user_id, "Обнаружен список")
-
-    points = clean_content.split("\n")[:num_points]
-    texts = []
-    MAX_RETRIES = 5
-    for idx, point in enumerate(points, start=1):
-        await safe_send_and_store(context, user_id, f"Генерируем текст для пункта {idx}/{len(points)}...")
-        text_prompt = (
-            f"""Напиши развернутый текст объёмом примерно 420 слов на тему: "{strip_leading_number(point)}".
-            Пиши цельный, связный и информативный текст, избегая повторов и "воды".
-            Не используй подзаголовки, маркированные или нумерованные списки, таблицы, цитаты и выделения.
-            Не начинай предложения с дефиса, тире, точки или других символов, не соответствующих обычному началу предложения.
-            Излагай информацию в логической последовательности, плавно переходя от одной мысли к другой.
-            Текст должен быть написан на русском языке и подходить для включения в основную часть научного или учебного проекта.
-            В ответе должен быть только сплошной текст, без каких-либо дополнительных инструкций, пояснений или разделителей.
-            """
-        )
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                raw_text = await send_deepseek_request_with_retry(text_prompt)
-                texts.append(raw_text.strip())
-                break
-            except Exception as e:
-                logger.error(f"Попытка {attempt}: Ошибка генерации текста для пункта {idx}: {e}")
-                if attempt == MAX_RETRIES:
-                    await safe_send_and_store(context, user_id, f"❌ Не удалось сгенерировать текст для раздела {idx} после {MAX_RETRIES} попыток. Пропускаем этот раздел.")
-                    texts.append("[Ошибка генерации текста. Попробуйте позже или обратитесь к поддержке. @denisgrosev]")
-                else:
-                    await asyncio.sleep(5)
-
-    create_project_directory()
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    primer_doc_path = os.path.join(PROJECTS_PATH, "primer.docx")
-    replacements = build_replacements(user_data)
-    doc_filename = create_project_docx(
-        primer_doc_path, PROJECTS_PATH, user_data['fio_student'], user_data['topic'], timestamp, replacements
-    )
-    doc = Document(doc_filename)
-    add_contents_page(doc, points)
-    for idx, (point, text) in enumerate(zip(points, texts), 1):
-        doc.add_page_break()
-        p = doc.add_paragraph()
-        run = p.add_run(strip_leading_number(point))
-        run.bold = True
-        run.font.size = Pt(14)
-        run.font.name = "Times New Roman"
-        p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-        p.paragraph_format.line_spacing = 1.5
-        p2 = doc.add_paragraph(text)
-        p2.alignment = WD_PARAGRAPH_ALIGNMENT.JUSTIFY
-        p2.paragraph_format.line_spacing = 1.5
-        p2.paragraph_format.first_line_indent = Cm(1.27)
-        for run in p2.runs:
-            run.font.size = Pt(14)
-            run.font.name = "Times New Roman"
-    remove_asterisks(doc)
-    add_page_breaks_around_contents(doc, points)
-    add_page_numbers(doc, points)
-    insert_page_break_after_last_content(doc, points)
-    doc.save(doc_filename)
-    await safe_send_and_store(context, user_id, "Проект успешно создан! Документ сохранён на сервере. А также отправлен в чат", reply_markup=BACK_TO_MENU_BTN)
-    with open(doc_filename, "rb") as f:
-        await context.bot.send_document(user_id, f, filename=os.path.basename(doc_filename), caption="Спасибо за покупку, оставьте отзыв :З @rewiew_of_project")
 
 async def error_handler(update, context):
     logger.error(f"Exception: {context.error}")
