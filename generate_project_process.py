@@ -2,6 +2,7 @@
 import os
 import sys
 import json
+import time
 import logging
 import shutil
 import re
@@ -57,6 +58,35 @@ HEADERS = {
 }
 ADMIN_ID = args.admin_id
 USER_ID = args.user_id
+
+
+
+def safe_soffice_convert(docx_path, pdf_path):
+    """
+    Выполняет конвертацию docx->pdf с бесконечными повторами при ошибке OOM (exit code 137) или любой ошибке.
+    """
+    import subprocess
+    outdir = os.path.dirname(os.path.abspath(pdf_path))
+    while True:
+        try:
+            print(f"Попытка конвертации: {docx_path} -> {pdf_path}")
+            result = subprocess.run([
+                '/usr/bin/soffice', '--headless', '--convert-to', 'pdf',
+                '--outdir', outdir, docx_path
+            ], check=True)
+            if os.path.exists(pdf_path):
+                print("Конвертация прошла успешно.")
+                break
+            else:
+                print(f"PDF не найден: {pdf_path}")
+                raise RuntimeError("PDF не найден после конвертации")
+        except subprocess.CalledProcessError as e:
+            print(f"Ошибка конвертации: {e}, код возврата: {e.returncode}")
+            print("Жду 30 секунд и пробую снова...")
+            time.sleep(30)
+        except Exception as ex:
+            print(f"Неожиданная ошибка: {ex}")
+            time.sleep(30)
 
 # =================== UTILS ======================
 def sanitize_filename(text):
@@ -169,7 +199,7 @@ def add_page_numbers(doc, points, temp_docx_path="_temp_toc.docx", temp_pdf_path
     logger.info(f"Сохраняем docx для постраничного анализа: {temp_docx_path}")
     doc.save(temp_docx_path)
     logger.info(f"Конвертируем docx в pdf: {temp_pdf_path}")
-    convert(temp_docx_path, temp_pdf_path)
+    safe_soffice_convert(temp_docx_path, temp_pdf_path)
     pages_dict = {}
     logger.info(f"Открываем pdf для анализа: {temp_pdf_path}")
     with pdfplumber.open(temp_pdf_path) as pdf:
