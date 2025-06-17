@@ -1,8 +1,9 @@
 import os
 import json
+import asyncio
 from telegram import Bot
 
-# Жёстко задаём путь к файлу в нужной папке
+# Жёстко задаём путь к файлу баланса
 BALANCE_FILE = "/app/data/files212/user_balances.json"
 
 # Жёстко задаём токен ТГ-бота (НЕ рекомендуется для публичного кода!)
@@ -20,11 +21,26 @@ def save_balances(balances):
         json.dump(balances, f, ensure_ascii=False, indent=2)
 
 def notify_user(user_id, message):
+    """
+    Универсальная функция для отправки уведомлений.
+    Работает и с python-telegram-bot 13.x (sync), и с 20.x+ (async).
+    """
     try:
         bot = Bot(token=BOT_TOKEN)
-        bot.send_message(chat_id=user_id, text=message)
+        send_msg = bot.send_message
+        if asyncio.iscoroutinefunction(send_msg):
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop and loop.is_running():
+                asyncio.create_task(send_msg(chat_id=user_id, text=message))
+            else:
+                asyncio.run(send_msg(chat_id=user_id, text=message))
+        else:
+            send_msg(chat_id=user_id, text=message)
     except Exception as e:
-        print(f"Ошибка при отправке уведомления: {e}")
+        print(f"Ошибка при отправке уведомления пользователю {user_id}: {e}")
 
 def get_referrer_id(user_id):
     balances = load_balances()
@@ -52,8 +68,6 @@ def update_user_info(user_id, username, referrer_id=None):
             changed = True
     if changed:
         save_balances(balances)
-    else:
-        save_balances(balances)
 
 def find_user_id_by_username(username):
     balances = load_balances()
@@ -74,7 +88,7 @@ def get_user_balance(user_id):
         save_balances(balances)
     return balances[user_id_str].get("balance", 0)
 
-def set_user_balance(user_id, amount, admin_action=False):
+def set_user_balance(user_id, amount, admin_action=False, admin_id=None):
     balances = load_balances()
     user_id_str = str(user_id)
     before = balances.get(user_id_str, {}).get("balance", 0)
@@ -88,8 +102,11 @@ def set_user_balance(user_id, amount, admin_action=False):
     else:
         msg = f"Ваш баланс теперь: {float(amount)}₽."
     notify_user(user_id, msg)
+    if admin_id:
+        msg_admin = f"Вы установили пользователю {user_id} баланс на {float(amount)}₽ (было: {before}₽)."
+        notify_user(admin_id, msg_admin)
 
-def add_user_balance(user_id, amount, source=""):
+def add_user_balance(user_id, amount, source="", admin_id=None):
     balances = load_balances()
     user_id_str = str(user_id)
     before = balances.get(user_id_str, {}).get("balance", 0)
@@ -104,8 +121,11 @@ def add_user_balance(user_id, amount, source=""):
     if source:
         msg += f"\nИсточник: {source}"
     notify_user(user_id, msg)
+    if admin_id:
+        msg_admin = f"Вы пополнили баланс пользователя {user_id} на {float(amount)}₽. Новый баланс: {after}₽"
+        notify_user(admin_id, msg_admin)
 
-def deduct_user_balance(user_id, amount, reason=""):
+def deduct_user_balance(user_id, amount, reason="", admin_id=None):
     balances = load_balances()
     user_id_str = str(user_id)
     if user_id_str not in balances or not isinstance(balances[user_id_str], dict):
@@ -120,10 +140,13 @@ def deduct_user_balance(user_id, amount, reason=""):
         if reason:
             msg += f"\nПричина: {reason}"
         notify_user(user_id, msg)
+        if admin_id:
+            msg_admin = f"Вы списали у пользователя {user_id} {float(amount)}₽. Остаток: {balances[user_id_str]['balance']}₽"
+            notify_user(admin_id, msg_admin)
         return True
     return False
 
-def minus_user_balance(user_id, amount, reason=""):
+def minus_user_balance(user_id, amount, reason="", admin_id=None):
     balances = load_balances()
     user_id_str = str(user_id)
     before = balances.get(user_id_str, {}).get("balance", 0)
@@ -140,13 +163,16 @@ def minus_user_balance(user_id, amount, reason=""):
     if reason:
         msg += f"\nПричина: {reason}"
     notify_user(user_id, msg)
+    if admin_id:
+        msg_admin = f"Вы уменьшили баланс пользователя {user_id} на {float(amount)}₽. Новый баланс: {after}₽"
+        notify_user(admin_id, msg_admin)
 
 def get_ref_balance(user_id):
     balances = load_balances()
     user_id_str = str(user_id)
     return balances.get(user_id_str, {}).get("ref_balance", 0)
 
-def set_ref_balance(user_id, value, admin_action=False):
+def set_ref_balance(user_id, value, admin_action=False, admin_id=None):
     balances = load_balances()
     user_id_str = str(user_id)
     before = balances.get(user_id_str, {}).get("ref_balance", 0)
@@ -158,8 +184,11 @@ def set_ref_balance(user_id, value, admin_action=False):
         else:
             msg = f"Ваш реферальный баланс теперь: {float(value)}₽."
         notify_user(user_id, msg)
+        if admin_id:
+            msg_admin = f"Вы установили реферальный баланс пользователя {user_id} на {float(value)}₽ (было: {before}₽)."
+            notify_user(admin_id, msg_admin)
 
-def add_ref_balance(user_id, amount, source=""):
+def add_ref_balance(user_id, amount, source="", admin_id=None):
     balances = load_balances()
     user_id_str = str(user_id)
     before = balances.get(user_id_str, {}).get("ref_balance", 0)
@@ -172,6 +201,9 @@ def add_ref_balance(user_id, amount, source=""):
         if source:
             msg += f"\nИсточник: {source}"
         notify_user(user_id, msg)
+        if admin_id:
+            msg_admin = f"Вы пополнили реферальный баланс пользователя {user_id} на {float(amount)}₽. Новый реф. баланс: {after}₽"
+            notify_user(admin_id, msg_admin)
 
 def process_referral_bonus(user_id, amount):
     balances = load_balances()
