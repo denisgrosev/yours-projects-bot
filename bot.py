@@ -16,6 +16,7 @@ from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_TAB_ALIGNMENT, WD_TAB_LEADER
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from balance_utils import add_user_balance, set_ref_balance
+from welcome_menu import show_welcome_menu, welcome_menu_callback
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -25,6 +26,7 @@ from telegram.ext import (
 from telegram.error import TelegramError, TimedOut, NetworkError
 
 BALANCES_PATH = "/app/data/files212/user_balances.json"
+# /app/data/files212/user_balances.json
 
 from balance_utils import get_user_balance, deduct_user_balance
 from yookassa_api import create_payment
@@ -630,6 +632,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id_str = str(user.id)
     if user_id_str not in balances:
         update_user_info(user.id, user.username, referrer_id)
+        from welcome_menu import show_welcome_menu
+        await show_welcome_menu(update, context)
+        return ConversationHandler.END
     else:
         update_user_info(user.id, user.username)
 
@@ -849,6 +854,9 @@ async def error_handler(update, context):
 def main():
     application = Application.builder().token("7819985767:AAG130I3AVmnskfJOSL95q7yga69VMiyeDU").build()
 
+#токен тест бота 7784274641:AAGiWNO4PNMwwQj-PFPSIfO5qzG2vXx0hiI
+#токен ориг бота 7819985767:AAG130I3AVmnskfJOSL95q7yga69VMiyeDU
+
     new_proj_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(main_menu_handler, pattern="^new_project$"),
                       CommandHandler("new_progect", new_progect_start)],
@@ -869,6 +877,7 @@ def main():
         ],
     )
 
+    application.add_handler(CallbackQueryHandler(welcome_menu_callback, pattern="^welcome_"))
     application.add_handler(CommandHandler("start", start))
     application.add_handler(topup_conv)
     application.add_handler(new_proj_conv)
