@@ -25,6 +25,7 @@ from telegram.ext import (
 )
 from telegram.error import TelegramError, TimedOut, NetworkError
 
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 BALANCES_PATH = "/app/data/files212/user_balances.json"
 # /app/data/files212/user_balances.json
 
@@ -72,7 +73,8 @@ BOT_RETURN_URL = "https://t.me/yours_projects_bot"
 ADMIN_ID = 5236886477
 
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
-API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-813cf716149d4404a3eb37cd6933096f")
+API_KEY = os.getenv("DEEPSEEK_API_KEY")
+
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json"
@@ -812,9 +814,11 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         # --- ЭТОТ КУСОК ВСТАВИТЬ ---
         # Путь до скрипта генерации
         generator_path = os.path.join(os.path.dirname(__file__), "generate_project_process.py")
+        # --- КОНЕЦ ВСТАВКИ ---
+
         subprocess.Popen([
             sys.executable, generator_path,
-            "--token", "7819985767:AAG130I3AVmnskfJOSL95q7yga69VMiyeDU",
+            "--token", TELEGRAM_BOT_TOKEN,
             "--user_id", str(user_id),
             "--fio_student", context.user_data.get('fio_student', ''),
             "--topic", context.user_data.get('topic', ''),
@@ -826,10 +830,9 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "--spec_name", context.user_data.get('spec_name', ''),
             "--primer_path", os.path.join(PROJECTS_PATH, "primer.docx"),
             "--output_dir", PROJECTS_PATH,
-            "--deepseek_api_key", "sk-813cf716149d4404a3eb37cd6933096f",
+            "--deepseek_api_key", API_KEY,
             "--admin_id", str(ADMIN_ID),
         ])
-        # --- КОНЕЦ ВСТАВКИ ---
 
         return ConversationHandler.END
 
@@ -852,10 +855,8 @@ async def error_handler(update, context):
         logger.error(f"Ошибка при попытке отправить админу: {e}")
 
 def main():
-    application = Application.builder().token("7819985767:AAG130I3AVmnskfJOSL95q7yga69VMiyeDU").build()
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-#токен тест бота 7784274641:AAGiWNO4PNMwwQj-PFPSIfO5qzG2vXx0hiI
-#токен ориг бота 7819985767:AAG130I3AVmnskfJOSL95q7yga69VMiyeDU
 
     new_proj_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(main_menu_handler, pattern="^new_project$"),
