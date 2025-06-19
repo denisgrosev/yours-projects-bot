@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import uuid
 import sys
 import json
 import time
@@ -7,6 +8,7 @@ import logging
 import shutil
 import re
 import asyncio
+
 from datetime import datetime
 from docx.shared import Pt, Cm
 from docx.enum.text import WD_BREAK
@@ -17,6 +19,20 @@ import pdfplumber
 from libreoffice_converter import convert
 
 import argparse
+
+LOG_DIR = "/app/data/files212/"
+os.makedirs(LOG_DIR, exist_ok=True)
+log_filename = os.path.join(LOG_DIR, "generate_project_log.txt")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    handlers=[
+        logging.FileHandler(log_filename, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 print("Process started with PID:", os.getpid())
 
@@ -197,7 +213,11 @@ def add_contents_page(doc, points):
         p.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
         p.paragraph_format.line_spacing = 1.5
 
-def add_page_numbers(doc, points, temp_docx_path="_temp_toc.docx", temp_pdf_path="_temp_toc.pdf"):
+def add_page_numbers(doc, points):
+    pid = os.getpid()
+    unique_id = f"{pid}_{uuid.uuid4().hex}"
+    temp_docx_path = f"_temp_toc_{unique_id}.docx"
+    temp_pdf_path = f"_temp_toc_{unique_id}.pdf"
     logger.info(f"Сохраняем docx для постраничного анализа: {temp_docx_path}")
     doc.save(temp_docx_path)
     logger.info(f"Конвертируем docx в pdf: {temp_pdf_path}")
