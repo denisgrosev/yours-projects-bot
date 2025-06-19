@@ -7,7 +7,7 @@ from telegram import Bot
 BALANCE_FILE = "/app/data/files212/user_balances.json"
 
 # Жёстко задаём токен ТГ-бота (НЕ рекомендуется для публичного кода!)
-BOT_TOKEN = "7819985767:AAG130I3AVmnskfJOSL95q7yga69VMiyeDU"
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 def load_balances():
     if os.path.exists(BALANCE_FILE):
