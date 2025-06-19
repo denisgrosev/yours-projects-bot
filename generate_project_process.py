@@ -57,15 +57,6 @@ parser.add_argument('--admin_id', required=True, type=int, help='ID админа
 
 args = parser.parse_args()
 
-# ================= ЛОГГИРОВАНИЕ =================
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(name)s %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
 
 # =================== КОНСТАНТЫ ==================
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
