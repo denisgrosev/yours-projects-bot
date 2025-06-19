@@ -20,6 +20,8 @@ import argparse
 
 print("Process started with PID:", os.getpid())
 
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
 parser = argparse.ArgumentParser(description="Генерация проекта в отдельном процессе и сопровождение пользователя в Telegram")
 parser.add_argument('--token', required=True, help='Токен Telegram-бота')
