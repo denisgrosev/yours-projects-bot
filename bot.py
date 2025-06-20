@@ -26,7 +26,7 @@ from telegram.ext import (
 from telegram.error import TelegramError, TimedOut, NetworkError
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-BALANCES_PATH = "/app/data/files212/user_balances.json"
+BALANCES_PATH = "/app/data/files212/balance_utils/user_balances.json"
 # /app/data/files212/user_balances.json
 
 from balance_utils import get_user_balance, deduct_user_balance
