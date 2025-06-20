@@ -8,7 +8,6 @@ import logging
 import shutil
 import re
 import asyncio
-
 from datetime import datetime
 from docx.shared import Pt, Cm
 from docx.enum.text import WD_BREAK
@@ -20,21 +19,11 @@ from libreoffice_converter import convert
 
 import argparse
 
-LOG_DIR = "/app/data/files212/"
+PROJECTS_DIR = "/app/data/files212/generate_project/projects"
+os.makedirs(PROJECTS_DIR, exist_ok=True)
+LOG_DIR = "/app/data/files212/generate_project/log"
+
 os.makedirs(LOG_DIR, exist_ok=True)
-log_filename = os.path.join(LOG_DIR, "generate_project_log.txt")
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    handlers=[
-        logging.FileHandler(log_filename, encoding='utf-8'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
-print("Process started with PID:", os.getpid())
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
@@ -56,6 +45,23 @@ parser.add_argument('--deepseek_api_key', required=True, help='API ключ Deep
 parser.add_argument('--admin_id', required=True, type=int, help='ID админа для отправки ошибок')
 
 args = parser.parse_args()
+
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+log_filename = os.path.join(LOG_DIR, f"generate_project_log_{args.user_id}_{timestamp}.txt")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    handlers=[
+        logging.FileHandler(log_filename, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+print("Process started with PID:", os.getpid())
+
+
 
 
 # =================== КОНСТАНТЫ ==================
@@ -454,6 +460,9 @@ async def main():
         doc_filename = os.path.join(output_dir, f"{safe_fio}. {safe_theme}.{timestamp}.docx")
         logger.info(f"Сохраняем финальный docx на диск: {doc_filename}")
         doc.save(doc_filename)
+        project_copy_path = os.path.join(PROJECTS_DIR, os.path.basename(doc_filename))
+        shutil.copyfile(doc_filename, project_copy_path)
+        logger.info(f"Проект продублирован в: {project_copy_path}")
 
         await safe_send_message(bot, user_id, "Проект успешно создан! Документ отправлен в чат.")
         logger.info(f"Отправляем документ пользователю {user_id} через Telegram")
