@@ -36,7 +36,7 @@ parser.add_argument('--topic', required=True, help='Тема проекта')
 parser.add_argument('--subject', required=True, help='Предмет')
 parser.add_argument('--group', required=True, help='Группа')
 parser.add_argument('--fio_teacher', required=True, help='ФИО преподавателя')
-parser.add_argument('--num_points', required=True, type=int, help='Количество пунктов содержания')
+parser.add_argument('--num_points', required=True, type=int, help='Количество пунктов содержания (без учёта заключения и источников)')
 parser.add_argument('--spec_number', default='', help='Номер специальности')
 parser.add_argument('--spec_name', default='', help='Название специальности')
 parser.add_argument('--primer_path', required=True, help='Путь к шаблону primer.docx')
@@ -61,9 +61,6 @@ logger = logging.getLogger(__name__)
 
 print("Process started with PID:", os.getpid())
 
-
-
-
 # =================== КОНСТАНТЫ ==================
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 API_KEY = args.deepseek_api_key
@@ -74,12 +71,7 @@ HEADERS = {
 ADMIN_ID = args.admin_id
 USER_ID = args.user_id
 
-
-
 def safe_soffice_convert(docx_path, pdf_path):
-    """
-    Выполняет конвертацию docx->pdf с бесконечными повторами при ошибке OOM (exit code 137) или любой ошибке.
-    """
     import subprocess
     outdir = os.path.dirname(os.path.abspath(pdf_path))
     while True:
@@ -103,7 +95,6 @@ def safe_soffice_convert(docx_path, pdf_path):
             print(f"Неожиданная ошибка: {ex}")
             time.sleep(30)
 
-# =================== UTILS ======================
 def sanitize_filename(text):
     forbidden_chars = '/\\:*?"<>|'
     for char in forbidden_chars:
@@ -361,13 +352,15 @@ async def main():
         topic = user_data['topic']
         subject = user_data['subject']
         num_points = user_data['num_points']
+
+        # 1. Запрашиваем список разделов КРОМЕ заключения и источников
         content_prompt = (
             f"""Привет, я пишу проект по теме: {topic}, по предмету: {subject}.
             Составь нумерованный список из {num_points} уникальных, содержательных пунктов для содержания этого проекта. 
             В них не должно быть много текста, чтобы они поместились в содержание, в идеале около трех слов.
             Не добавляй подпунктов, пояснений, заголовков или инструкций — только сами пункты списка.
             Первый пункт должен быть по теме проекта, а не повторять формулировку задания.
-            Не используй пункты типа "Введение", "Заключение", "Список литературы", "{num_points} пунктов содержания" и тому подобное.
+            Первый пункт должен быть, "Введение", а последний "Заключение" не добавлять!
             Каждый пункт должен отражать отдельный аспект или раздел по теме.
             Оформи исключительно в виде нумерованного списка, без лишнего текста до и после."""
         )
@@ -377,34 +370,69 @@ async def main():
         clean_content = extract_clean_content(raw_content)
         await safe_send_message(bot, user_id, "Обнаружен список")
 
-        points = clean_content.split("\n")[:num_points]
+        # 2. Собираем итоговые пункты: введение (1), основные (num_points-2), заключение, список источников (последний)
+        main_points = clean_content.split("\n")[:num_points]
+        # Вставляем "Введение" первым, если его нет
+        if not main_points[0].strip().lower().startswith("введение"):
+            main_points = ["Введение"] + main_points
+        # Удаляем "Заключение", если оно есть среди пунктов (будет добавлено отдельно)
+        main_points = [p for p in main_points if strip_leading_number(p).strip().lower() != "заключение"]
+        # Формируем полный список пунктов
+        points = []
+        points.extend(main_points)
+        points.append("Заключение")
+        points.append("Список используемых источников")
+
         texts = []
         MAX_RETRIES = 5
+
         for idx, point in enumerate(points, start=1):
-            await safe_send_message(bot, user_id, f"Генерируем текст для пункта {idx}/{len(points)}...")
-            text_prompt = (
-                f"""Напиши развернутый текст объёмом примерно 420 слов на тему: "{strip_leading_number(point)}".
-                Пиши цельный, связный и информативный текст, избегая повторов и "воды".
-                Не используй подзаголовки, маркированные или нумерованные списки, таблицы, цитаты и выделения.
-                Не начинай предложения с дефиса, тире, точки или других символов, не соответствующих обычному началу предложения.
-                Излагай информацию в логической последовательности, плавно переходя от одной мысли к другой.
-                Текст должен быть написан на русском языке и подходить для включения в основную часть научного или учебного проекта.
-                В ответе должен быть только сплошной текст, без каких-либо дополнительных инструкций, пояснений или рамок.
-                """
-            )
-            for attempt in range(1, MAX_RETRIES + 1):
-                try:
-                    logger.info(f"Генерация текста для пункта {idx} (попытка {attempt})")
-                    raw_text = await send_deepseek_request_with_retry(text_prompt)
-                    texts.append(raw_text.strip())
-                    break
-                except Exception as e:
-                    logger.error(f"Попытка {attempt}: Ошибка генерации текста для пункта {idx}: {e}")
-                    if attempt == MAX_RETRIES:
-                        await safe_send_message(bot, user_id, f"❌ Не удалось сгенерировать текст для раздела {idx} после {MAX_RETRIES} попыток. Пожалуйста, попробуйте позже или обратитесь к поддержке.")
-                        texts.append("[Ошибка генерации текста. Попробуйте позже или обратитесь к поддержке. @denisgrosev]")
-                    else:
-                        await asyncio.sleep(5)
+            if strip_leading_number(point).strip().lower() == "список используемых источников":
+                await safe_send_message(bot, user_id, f"Генерируем {idx}/{len(points)}: Список источников...")
+
+                sources_prompt = (
+                    f"""Сформируй корректно оформленный по ГОСТу список из 7-10 используемых источников для проекта на тему: "{topic}" по предмету "{subject}".
+                    Не добавляй заголовок, списки или пояснения — только сами записи источников, каждый с новой строки.
+                    В ответе должны быть только сами записи источников, без лишнего текста до и после."""
+                )
+                for attempt in range(1, MAX_RETRIES + 1):
+                    try:
+                        logger.info(f"Генерация списка источников (попытка {attempt})")
+                        sources_text = await send_deepseek_request_with_retry(sources_prompt)
+                        texts.append(sources_text.strip())
+                        break
+                    except Exception as e:
+                        logger.error(f"Попытка {attempt}: Ошибка генерации списка источников: {e}")
+                        if attempt == MAX_RETRIES:
+                            await safe_send_message(bot, user_id, f"❌ Не удалось сгенерировать список источников после {MAX_RETRIES} попыток. Попробуйте позже или обратитесь к поддержке.")
+                            texts.append("[Ошибка генерации источников. Попробуйте позже или обратитесь к поддержке. @denisgrosev]")
+                        else:
+                            await asyncio.sleep(5)
+            else:
+                await safe_send_message(bot, user_id, f"Генерируем текст для пункта {idx}/{len(points)}...")
+                text_prompt = (
+                    f"""Напиши развернутый текст объёмом примерно 420 слов на тему: "{strip_leading_number(point)}".
+                    Пиши цельный, связный и информативный текст, избегая повторов и "воды".
+                    Не используй подзаголовки, маркированные или нумерованные списки, таблицы, цитаты и выделения.
+                    Не начинай предложения с дефиса, тире, точки или других символов, не соответствующих обычному началу предложения.
+                    Излагай информацию в логической последовательности, плавно переходя от одной мысли к другой.
+                    Текст должен быть написан на русском языке и подходить для включения в основную часть научного или учебного проекта.
+                    В ответе должен быть только сплошной текст, без каких-либо дополнительных инструкций, пояснений или рамок.
+                    """
+                )
+                for attempt in range(1, MAX_RETRIES + 1):
+                    try:
+                        logger.info(f"Генерация текста для пункта {idx} (попытка {attempt})")
+                        raw_text = await send_deepseek_request_with_retry(text_prompt)
+                        texts.append(raw_text.strip())
+                        break
+                    except Exception as e:
+                        logger.error(f"Попытка {attempt}: Ошибка генерации текста для пункта {idx}: {e}")
+                        if attempt == MAX_RETRIES:
+                            await safe_send_message(bot, user_id, f"❌ Не удалось сгенерировать текст для раздела {idx} после {MAX_RETRIES} попыток. Пожалуйста, попробуйте позже или обратитесь к поддержке.")
+                            texts.append("[Ошибка генерации текста. Попробуйте позже или обратитесь к поддержке. @denisgrosev]")
+                        else:
+                            await asyncio.sleep(5)
 
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         primer_doc_path = args.primer_path
@@ -419,7 +447,6 @@ async def main():
         os.makedirs(output_dir, exist_ok=True)
         replacements = build_replacements(user_data)
 
-        # Генерируем docx в памяти вместо временного файла
         from io import BytesIO
         with open(primer_doc_path, "rb") as f:
             primer_bytes = f.read()
@@ -450,7 +477,6 @@ async def main():
         add_page_numbers(doc, points)
         insert_page_break_after_last_content(doc, points)
 
-        # Сохраняем финал в памяти и на диск (для отладки)
         output_buffer = BytesIO()
         doc.save(output_buffer)
         output_buffer.seek(0)
