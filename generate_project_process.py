@@ -2,7 +2,6 @@
 import os
 import uuid
 import sys
-import json
 import time
 import logging
 import shutil
@@ -15,14 +14,12 @@ from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_TAB_ALIGNMENT, WD_TAB_LEADER
 from telegram import Bot, InputFile
 import pdfplumber
-from libreoffice_converter import convert
 
 import argparse
 
 PROJECTS_DIR = "/app/data/files212/generate_project/projects"
 os.makedirs(PROJECTS_DIR, exist_ok=True)
 LOG_DIR = "/app/data/files212/generate_project/log"
-
 os.makedirs(LOG_DIR, exist_ok=True)
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -36,7 +33,7 @@ parser.add_argument('--topic', required=True, help='Тема проекта')
 parser.add_argument('--subject', required=True, help='Предмет')
 parser.add_argument('--group', required=True, help='Группа')
 parser.add_argument('--fio_teacher', required=True, help='ФИО преподавателя')
-parser.add_argument('--num_points', required=True, type=int, help='Количество пунктов содержания (без учёта заключения и источников)')
+parser.add_argument('--num_points', required=True, type=int, help='Количество пунктов содержания (без учета источников)')
 parser.add_argument('--spec_number', default='', help='Номер специальности')
 parser.add_argument('--spec_name', default='', help='Название специальности')
 parser.add_argument('--primer_path', required=True, help='Путь к шаблону primer.docx')
@@ -325,7 +322,7 @@ async def safe_send_message(bot, chat_id, *args, **kwargs):
     from telegram.error import TimedOut, NetworkError, TelegramError
     for i in range(20):
         try:
-            logger.info(f"Отправляем сообщение [{i+1} попытка] пользователю {chat_id}: {args if args else ''} {kwargs if kwargs else ''}")
+            logger.info(f"Отправляем сообщение [{i+1} попытка] пользователю {chat_id}: {args if args else ''} {kwargs if args else ''}")
             return await bot.send_message(chat_id, *args, **kwargs)
         except (TimedOut, NetworkError, TelegramError) as e:
             logger.warning(f"safe_send_message попытка {i+1}: {e}")
@@ -353,15 +350,11 @@ async def main():
         subject = user_data['subject']
         num_points = user_data['num_points']
 
-        # 1. Запрашиваем список разделов КРОМЕ заключения и источников
         content_prompt = (
             f"""Привет, я пишу проект по теме: {topic}, по предмету: {subject}.
             Составь нумерованный список из {num_points} уникальных, содержательных пунктов для содержания этого проекта. 
             В них не должно быть много текста, чтобы они поместились в содержание, в идеале около трех слов.
             Не добавляй подпунктов, пояснений, заголовков или инструкций — только сами пункты списка.
-            Первый пункт должен быть по теме проекта, а не повторять формулировку задания.
-            Первый пункт должен быть, "Введение", а последний "Заключение" не добавлять!
-            Каждый пункт должен отражать отдельный аспект или раздел по теме.
             Оформи исключительно в виде нумерованного списка, без лишнего текста до и после."""
         )
         raw_content = await send_deepseek_request_with_retry(content_prompt)
@@ -370,24 +363,17 @@ async def main():
         clean_content = extract_clean_content(raw_content)
         await safe_send_message(bot, user_id, "Обнаружен список")
 
-        # 2. Собираем итоговые пункты: введение (1), основные (num_points-2), заключение, список источников (последний)
-        main_points = clean_content.split("\n")[:num_points]
-        # Вставляем "Введение" первым, если его нет
-        if not main_points[0].strip().lower().startswith("введение"):
-            main_points = ["Введение"] + main_points
-        # Удаляем "Заключение", если оно есть среди пунктов (будет добавлено отдельно)
-        main_points = [p for p in main_points if strip_leading_number(p).strip().lower() != "заключение"]
-        # Формируем полный список пунктов
-        points = []
-        points.extend(main_points)
-        points.append("Заключение")
-        points.append("Список используемых источников")
+        points = clean_content.split("\n")[:num_points]  # только столько, сколько заказал пользователь
+        points = [strip_leading_number(p).strip() for p in points if p.strip()]  # чистим
+
+        # Безо всяких "Введение" и "Заключение" принудительно!
+        points.append("Список используемых источников")  # только этот раздел принудительно
 
         texts = []
         MAX_RETRIES = 5
 
         for idx, point in enumerate(points, start=1):
-            if strip_leading_number(point).strip().lower() == "список используемых источников":
+            if point.lower() == "список используемых источников":
                 await safe_send_message(bot, user_id, f"Генерируем {idx}/{len(points)}: Список источников...")
 
                 sources_prompt = (
@@ -397,21 +383,18 @@ async def main():
                 )
                 for attempt in range(1, MAX_RETRIES + 1):
                     try:
-                        logger.info(f"Генерация списка источников (попытка {attempt})")
                         sources_text = await send_deepseek_request_with_retry(sources_prompt)
                         texts.append(sources_text.strip())
                         break
                     except Exception as e:
-                        logger.error(f"Попытка {attempt}: Ошибка генерации списка источников: {e}")
                         if attempt == MAX_RETRIES:
-                            await safe_send_message(bot, user_id, f"❌ Не удалось сгенерировать список источников после {MAX_RETRIES} попыток. Попробуйте позже или обратитесь к поддержке.")
                             texts.append("[Ошибка генерации источников. Попробуйте позже или обратитесь к поддержке. @denisgrosev]")
                         else:
                             await asyncio.sleep(5)
             else:
                 await safe_send_message(bot, user_id, f"Генерируем текст для пункта {idx}/{len(points)}...")
                 text_prompt = (
-                    f"""Напиши развернутый текст объёмом примерно 420 слов на тему: "{strip_leading_number(point)}".
+                    f"""Напиши развернутый текст объёмом примерно 420 слов на тему: "{point}".
                     Пиши цельный, связный и информативный текст, избегая повторов и "воды".
                     Не используй подзаголовки, маркированные или нумерованные списки, таблицы, цитаты и выделения.
                     Не начинай предложения с дефиса, тире, точки или других символов, не соответствующих обычному началу предложения.
@@ -422,14 +405,11 @@ async def main():
                 )
                 for attempt in range(1, MAX_RETRIES + 1):
                     try:
-                        logger.info(f"Генерация текста для пункта {idx} (попытка {attempt})")
                         raw_text = await send_deepseek_request_with_retry(text_prompt)
                         texts.append(raw_text.strip())
                         break
                     except Exception as e:
-                        logger.error(f"Попытка {attempt}: Ошибка генерации текста для пункта {idx}: {e}")
                         if attempt == MAX_RETRIES:
-                            await safe_send_message(bot, user_id, f"❌ Не удалось сгенерировать текст для раздела {idx} после {MAX_RETRIES} попыток. Пожалуйста, попробуйте позже или обратитесь к поддержке.")
                             texts.append("[Ошибка генерации текста. Попробуйте позже или обратитесь к поддержке. @denisgrosev]")
                         else:
                             await asyncio.sleep(5)
@@ -459,16 +439,23 @@ async def main():
         for idx, (point, text) in enumerate(zip(points, texts), 1):
             doc.add_page_break()
             p = doc.add_paragraph()
-            run = p.add_run(strip_leading_number(point))
+            run = p.add_run(point)
             run.bold = True
             run.font.size = Pt(14)
             run.font.name = "Times New Roman"
             p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             p.paragraph_format.line_spacing = 1.5
+
             p2 = doc.add_paragraph(text)
-            p2.alignment = WD_PARAGRAPH_ALIGNMENT.JUSTIFY
-            p2.paragraph_format.line_spacing = 1.5
-            p2.paragraph_format.first_line_indent = Cm(1.27)
+            if point.lower() == "список используемых источников":
+                # Без отступа, строго по левому краю!
+                p2.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+                p2.paragraph_format.line_spacing = 1.5
+                p2.paragraph_format.first_line_indent = Cm(0)
+            else:
+                p2.alignment = WD_PARAGRAPH_ALIGNMENT.JUSTIFY
+                p2.paragraph_format.line_spacing = 1.5
+                p2.paragraph_format.first_line_indent = Cm(1.27)
             for run in p2.runs:
                 run.font.size = Pt(14)
                 run.font.name = "Times New Roman"
