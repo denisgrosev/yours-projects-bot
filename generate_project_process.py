@@ -17,6 +17,12 @@ import pdfplumber
 
 import argparse
 
+# === чат-история для DeepSeek ===
+MAX_HISTORY = 10
+chat_history = [
+    {"role": "system", "content": "Отвечай только на русском языке. Четко следуй всем инструкциям."}
+]
+
 PROJECTS_DIR = "/app/data/files212/generate_project/projects"
 os.makedirs(PROJECTS_DIR, exist_ok=True)
 LOG_DIR = "/app/data/files212/generate_project/log"
@@ -278,26 +284,29 @@ def add_page_breaks_around_contents(doc, points):
         insert_page_break_after(doc.paragraphs[last_point_idx])
 
 def send_deepseek_request(prompt, temperature=0.7, max_tokens=7000):
+    global chat_history
+    import requests
+
+    # Добавить новое сообщение пользователя
+    chat_history.append({"role": "user", "content": prompt})
+    # Обрезать историю (system + последние MAX_HISTORY*2 сообщений)
+    if len(chat_history) > 1 + MAX_HISTORY * 2:
+        chat_history = [chat_history[0]] + chat_history[-MAX_HISTORY*2:]
+
     data = {
         "model": "deepseek-chat",
-        "messages": [
-            {"role": "system", "content": "Отвечай только на русском языке. Четко следуй всем инструкциям."},
-            {"role": "user", "content": prompt}
-        ],
+        "messages": chat_history,
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
-    import requests
-    try:
-        logger.info(f"Отправляем запрос в DeepSeek: prompt={prompt[:50]}..., temp={temperature}, max_tokens={max_tokens}")
-        response = requests.post(DEEPSEEK_API_URL, json=data, headers=HEADERS)
-        response.raise_for_status()
-        answer = response.json()['choices'][0]['message']['content']
-        logger.info(f"Ответ получен от DeepSeek (первые 50 символов): {answer[:50]}")
-        return answer
-    except Exception as e:
-        logger.error(f"Ошибка API: {e}")
-        raise
+    logger.info(f"Отправляем запрос в DeepSeek (чат): prompt={prompt[:50]}..., history_len={len(chat_history)}")
+    response = requests.post(DEEPSEEK_API_URL, json=data, headers=HEADERS)
+    response.raise_for_status()
+    answer = response.json()['choices'][0]['message']['content']
+    # Добавить ответ ассистента
+    chat_history.append({"role": "assistant", "content": answer})
+    logger.info(f"Ответ получен от DeepSeek (первые 50 символов): {answer[:50]}")
+    return answer
 
 async def send_deepseek_request_with_retry(prompt, temperature=0.7, max_tokens=7000, retries=3, delay=5):
     for attempt in range(1, retries + 1):
