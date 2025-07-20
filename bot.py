@@ -973,9 +973,19 @@ def main():
         entry_points=[CallbackQueryHandler(main_menu_handler, pattern="^new_project$"),
                       CommandHandler("new_progect", new_progect_start)],
         states={
-            NEW_TOPIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_topic)],
-            NEW_SUBJECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_subject)],
-            NEW_FIO: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_fio)],
+            NEW_TOPIC: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, new_topic),
+                CallbackQueryHandler(new_topic, pattern="^hint_topic$"),
+            ],
+            NEW_SUBJECT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, new_subject),
+                CallbackQueryHandler(new_subject, pattern="^hint_subject$"),
+            ],
+            NEW_FIO: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, new_fio),
+                CallbackQueryHandler(new_fio, pattern="^hint_fio_student$"),
+            ],
+
             NEW_GROUP: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_group)],
             NEW_SPEC_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_spec_number)],
             NEW_SPEC_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_spec_name)],
