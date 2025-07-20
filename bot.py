@@ -17,7 +17,7 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_TAB_ALIGNMENT, WD_TAB_LEAD
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from balance_utils import add_user_balance, set_ref_balance
 from welcome_menu import show_welcome_menu, welcome_menu_callback
-
+from hint_utils import save_user_hint, get_last_hint, make_hint_keyboard
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
@@ -749,19 +749,76 @@ async def example(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pass
 
 async def new_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['topic'] = update.message.text
-    await safe_send_and_store(context, update.effective_chat.id, "Введите предмет:", reply_markup=BACK_TO_MENU_BTN)
-    return NEW_SUBJECT
+    user_id = update.effective_user.id
+    if update.message:
+        topic = update.message.text
+        context.user_data['topic'] = topic
+        save_user_hint(user_id, "topic", topic)
+        await safe_send_and_store(
+            context, update.effective_chat.id, 
+            "Введите предмет:", 
+            reply_markup=make_hint_keyboard("subject", user_id, BACK_TO_MENU_BTN)
+        )
+        return NEW_SUBJECT
+    elif update.callback_query and update.callback_query.data == "hint_topic":
+        topic = get_last_hint(user_id, "topic")
+        context.user_data['topic'] = topic
+        save_user_hint(user_id, "topic", topic)
+        await update.callback_query.answer()
+        await safe_edit_and_store(
+            context, update.effective_chat.id, update.callback_query.message.message_id,
+            "Введите предмет:",
+            reply_markup=make_hint_keyboard("subject", user_id, BACK_TO_MENU_BTN)
+        )
+        return NEW_SUBJECT
 
 async def new_subject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['subject'] = update.message.text
-    await safe_send_and_store(context, update.effective_chat.id, "Введите ФИО обучающегося:", reply_markup=BACK_TO_MENU_BTN)
-    return NEW_FIO
+    user_id = update.effective_user.id
+    if update.message:
+        subject = update.message.text
+        context.user_data['subject'] = subject
+        save_user_hint(user_id, "subject", subject)
+        await safe_send_and_store(
+            context, update.effective_chat.id,
+            "Введите ФИО обучающегося:",
+            reply_markup=make_hint_keyboard("fio_student", user_id, BACK_TO_MENU_BTN)
+        )
+        return NEW_FIO
+    elif update.callback_query and update.callback_query.data == "hint_subject":
+        subject = get_last_hint(user_id, "subject")
+        context.user_data['subject'] = subject
+        save_user_hint(user_id, "subject", subject)
+        await update.callback_query.answer()
+        await safe_edit_and_store(
+            context, update.effective_chat.id, update.callback_query.message.message_id,
+            "Введите ФИО обучающегося:",
+            reply_markup=make_hint_keyboard("fio_student", user_id, BACK_TO_MENU_BTN)
+        )
+        return NEW_FIO
 
 async def new_fio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['fio_student'] = update.message.text
-    await safe_send_and_store(context, update.effective_chat.id, "Введите группу:", reply_markup=BACK_TO_MENU_BTN)
-    return NEW_GROUP
+    user_id = update.effective_user.id
+    if update.message:
+        fio = update.message.text
+        context.user_data['fio_student'] = fio
+        save_user_hint(user_id, "fio_student", fio)
+        await safe_send_and_store(
+            context, update.effective_chat.id,
+            "Введите группу:",
+            reply_markup=make_hint_keyboard("group", user_id, BACK_TO_MENU_BTN)
+        )
+        return NEW_GROUP
+    elif update.callback_query and update.callback_query.data == "hint_fio_student":
+        fio = get_last_hint(user_id, "fio_student")
+        context.user_data['fio_student'] = fio
+        save_user_hint(user_id, "fio_student", fio)
+        await update.callback_query.answer()
+        await safe_edit_and_store(
+            context, update.effective_chat.id, update.callback_query.message.message_id,
+            "Введите группу:",
+            reply_markup=make_hint_keyboard("group", user_id, BACK_TO_MENU_BTN)
+        )
+        return NEW_GROUP
 
 def get_spec_by_group(group):
     group = group.upper()
