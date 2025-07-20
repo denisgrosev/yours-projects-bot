@@ -89,10 +89,7 @@ PROJECTS_PATH = os.path.join(BASE_PATH, 'projects')
 # ======================= КНОПКИ =======================
 MAIN_MENU = InlineKeyboardMarkup([
     [InlineKeyboardButton("🖨️ Новый проект", callback_data="new_project")],
-    [InlineKeyboardButton("💬 Отзывы", url="https://t.me/rewiew_of_project")],
-    [InlineKeyboardButton("📁 Примеры работ", url="https://t.me/example_of_w0rk")],
     [InlineKeyboardButton("🏦 Баланс", callback_data="balance")],
-    [InlineKeyboardButton("💳 Пополнить баланс", callback_data="topup")],
     [InlineKeyboardButton("💸 Реферальная система", callback_data="referral_menu")],
 ])
 
@@ -700,15 +697,33 @@ async def new_progect_start(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         await safe_send_and_store(context, update.effective_chat.id, "Введите тему проекта:", reply_markup=BACK_TO_MENU_BTN)
     return NEW_TOPIC
 
+BALANCE_MENU = InlineKeyboardMarkup([
+    [InlineKeyboardButton("💳 Пополнить баланс", callback_data="topup")],
+    [InlineKeyboardButton("⬅️ Назад в меню", callback_data="menu")]
+])
+
 async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE, from_menu=False):
     update_user_info_from_update(update)
-    balance = get_user_balance(update.effective_user.id)
-    text = f"Ваш баланс: {balance}₽"
+    balance = int(get_user_balance(update.effective_user.id))
+    text = f"*Ваш баланс*: {balance}₽"
     await clear_last_bot_keyboard(context, update.effective_chat.id)
     if from_menu and update.callback_query:
-        await safe_edit_and_store(context, update.effective_chat.id, update.callback_query.message.message_id, text, reply_markup=BACK_TO_MENU_BTN)
+        await safe_edit_and_store(
+            context, 
+            update.effective_chat.id, 
+            update.callback_query.message.message_id, 
+            text, 
+            reply_markup=BALANCE_MENU, 
+            parse_mode="Markdown"
+        )
     else:
-        await safe_send_and_store(context, update.effective_chat.id, text, reply_markup=BACK_TO_MENU_BTN)
+        await safe_send_and_store(
+            context, 
+            update.effective_chat.id, 
+            text, 
+            reply_markup=BALANCE_MENU, 
+            parse_mode="Markdown"
+        )
 
 async def topup_balance_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await clear_last_bot_keyboard(context, update.effective_chat.id)
