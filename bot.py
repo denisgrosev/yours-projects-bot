@@ -114,9 +114,7 @@ MAIN_MENU = InlineKeyboardMarkup([
     [InlineKeyboardButton("💸 Реферальная система", callback_data="referral_menu")],
 ])
 
-BACK_TO_MENU_BTN = InlineKeyboardMarkup([
-    [InlineKeyboardButton("⬅️ Назад в меню", callback_data="menu")]
-])
+BACK_TO_MENU_BTN = InlineKeyboardButton("⬅️ Назад в меню", callback_data="menu")
 
 
 
