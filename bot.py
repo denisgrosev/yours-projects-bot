@@ -41,6 +41,27 @@ from admin_commands import (
 
 import random
 
+# === ЛОГ В КОНСОЛЬ И ФАЙЛ ===
+today = datetime.now().strftime("%Y-%m-%d")
+log_dir = "/app/data/files212/bot/log"
+os.makedirs(log_dir, exist_ok=True)
+log_path = os.path.join(log_dir, f"{today}.txt")
+
+class Tee(object):
+    def __init__(self, *files):
+        self.files = files
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+log_file = open(log_path, "a", encoding="utf-8")
+sys.stdout = Tee(sys.stdout, log_file)
+sys.stderr = Tee(sys.stderr, log_file)
+
 REF_EMOJI = [
     "👶", "🧒", "👦", "👧", "🧑", "👨", "👩", "🧓", "👴", "👵",  # дети, взрослые, пожилые
     "👱", "👱‍♂️", "👱‍♀️", "🧔", "🧔‍♂️", "🧔‍♀️",
