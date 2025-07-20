@@ -716,11 +716,24 @@ async def new_progect_start(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     context.user_data.clear()
     context.chat_data.clear()
     await clear_last_bot_keyboard(context, update.effective_chat.id)
+    user_id = update.effective_user.id
+    reply_markup = make_hint_keyboard("topic", user_id, BACK_TO_MENU_BTN)
+
     if from_menu and update.callback_query:
-        await safe_edit_and_store(context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Введите тему проекта:", reply_markup=BACK_TO_MENU_BTN)
+        await safe_edit_and_store(
+            context,
+            update.effective_chat.id,
+            update.callback_query.message.message_id,
+            "Введите тему проекта:",
+            reply_markup=reply_markup
+        )
     else:
-        await safe_send_and_store(context, update.effective_chat.id, "Введите тему проекта:", reply_markup=BACK_TO_MENU_BTN)
+        await safe_send_and_store(
+            context,
+            update.effective_chat.id,
+            "Введите тему проекта:",
+            reply_markup=reply_markup
+        )
     return NEW_TOPIC
 
 BALANCE_MENU = InlineKeyboardMarkup([
