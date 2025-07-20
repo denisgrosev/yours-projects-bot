@@ -662,7 +662,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.chat_data.clear()
     # Приветствие и меню
     if update.message:
-        await safe_send_and_store(context, update.effective_chat.id, text, reply_markup=MAIN_MENU)
+        await safe_send_and_store(context, update.effective_chat.id, text, reply_markup=MAIN_MENU, parse_mode="Markdown")
     elif update.callback_query:
         await update.callback_query.answer()
         await safe_edit_and_store(context, update.effective_chat.id, update.callback_query.message.message_id, text, reply_markup=MAIN_MENU)
@@ -705,7 +705,7 @@ BALANCE_MENU = InlineKeyboardMarkup([
 async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE, from_menu=False):
     update_user_info_from_update(update)
     balance = int(get_user_balance(update.effective_user.id))
-    text = f"*Ваш баланс*: {balance}₽"
+    text = f"*Твой баланс*: {balance}₽"
     await clear_last_bot_keyboard(context, update.effective_chat.id)
     if from_menu and update.callback_query:
         await safe_edit_and_store(
