@@ -88,11 +88,11 @@ PROJECTS_PATH = os.path.join(BASE_PATH, 'projects')
 
 # ======================= КНОПКИ =======================
 MAIN_MENU = InlineKeyboardMarkup([
-    [InlineKeyboardButton("🆕 Новый проект", callback_data="new_project")],
+    [InlineKeyboardButton("🖨️ Новый проект", callback_data="new_project")],
     [InlineKeyboardButton("💬 Отзывы", url="https://t.me/rewiew_of_project")],
     [InlineKeyboardButton("📁 Примеры работ", url="https://t.me/example_of_w0rk")],
-    [InlineKeyboardButton("💰 Баланс", callback_data="balance")],
-    [InlineKeyboardButton("➕ Пополнить баланс", callback_data="topup")],
+    [InlineKeyboardButton("🏦 Баланс", callback_data="balance")],
+    [InlineKeyboardButton("💳 Пополнить баланс", callback_data="topup")],
     [InlineKeyboardButton("💸 Реферальная система", callback_data="referral_menu")],
 ])
 
@@ -654,8 +654,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     invited_text = "\n".join([f"- {name}" for name in invited]) or "Пока нет приглашённых."
 
     text = (
-        "Привет! Этот бот поможет тебе создать проект.\n\n"
-        "Выберите действие:"
+        "Выбери действие:"
     )
 
     # Удаляем инлайн-клавиатуру с прошлого сообщения, если она была
