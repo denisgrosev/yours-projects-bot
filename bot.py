@@ -654,6 +654,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     invited_text = "\n".join([f"- {name}" for name in invited]) or "Пока нет приглашённых."
 
     text = (
+        "*«Твои проекты»* - быстро, просто, бюджетно.\n\n"
         "Выбери действие:"
     )
 
