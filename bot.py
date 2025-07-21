@@ -866,39 +866,135 @@ def get_spec_by_group(group):
         return "", ""
 
 async def new_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['group'] = update.message.text
-    spec_number, spec_name = get_spec_by_group(context.user_data['group'])
+    user_id = update.effective_user.id
+    if update.message:
+        group = update.message.text
+    elif update.callback_query and update.callback_query.data == "hint_group":
+        group = get_last_hint(user_id, "group")
+        await update.callback_query.answer()
+        await safe_edit_and_store(
+            context, update.effective_chat.id, update.callback_query.message.message_id,
+            "Введите ФИО преподавателя:",
+            reply_markup=make_hint_keyboard("fio_teacher", user_id, BACK_TO_MENU_BTN)
+        )
+    else:
+        return NEW_GROUP
+
+    context.user_data['group'] = group
+    save_user_hint(user_id, "group", group)
+    spec_number, spec_name = get_spec_by_group(group)
     if not spec_number or not spec_name:
-        await safe_send_and_store(context, update.effective_chat.id, "Группа не определяет специальность автоматически.\nПожалуйста, введите номер специальности (например, 23.02.07):", reply_markup=BACK_TO_MENU_BTN)
+        await safe_send_and_store(
+            context, update.effective_chat.id,
+            "Группа не определяет специальность автоматически.\nПожалуйста, введите номер специальности (например, 23.02.07):",
+            reply_markup=make_hint_keyboard("spec_number", user_id, BACK_TO_MENU_BTN)
+        )
         return NEW_SPEC_NUMBER
+
     context.user_data['spec_number'] = spec_number
     context.user_data['spec_name'] = spec_name
-    await safe_send_and_store(context, update.effective_chat.id, "Введите ФИО преподавателя:", reply_markup=BACK_TO_MENU_BTN)
+    await safe_send_and_store(
+        context, update.effective_chat.id,
+        "Введите ФИО преподавателя:",
+        reply_markup=make_hint_keyboard("fio_teacher", user_id, BACK_TO_MENU_BTN)
+    )
     return NEW_TEACHER
 
 async def new_spec_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['spec_number'] = update.message.text
-    await safe_send_and_store(context, update.effective_chat.id, "Теперь введите полное название специальности:", reply_markup=BACK_TO_MENU_BTN)
+    user_id = update.effective_user.id
+    if update.message:
+        spec_number = update.message.text
+    elif update.callback_query and update.callback_query.data == "hint_spec_number":
+        spec_number = get_last_hint(user_id, "spec_number")
+        await update.callback_query.answer()
+        await safe_edit_and_store(
+            context, update.effective_chat.id, update.callback_query.message.message_id,
+            "Теперь введите полное название специальности:",
+            reply_markup=make_hint_keyboard("spec_name", user_id, BACK_TO_MENU_BTN)
+        )
+    else:
+        return NEW_SPEC_NUMBER
+
+    context.user_data['spec_number'] = spec_number
+    save_user_hint(user_id, "spec_number", spec_number)
+    await safe_send_and_store(
+        context, update.effective_chat.id,
+        "Теперь введите полное название специальности:",
+        reply_markup=make_hint_keyboard("spec_name", user_id, BACK_TO_MENU_BTN)
+    )
     return NEW_SPEC_NAME
 
 async def new_spec_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['spec_name'] = update.message.text
-    await safe_send_and_store(context, update.effective_chat.id, "Введите ФИО преподавателя:", reply_markup=BACK_TO_MENU_BTN)
+    user_id = update.effective_user.id
+    if update.message:
+        spec_name = update.message.text
+    elif update.callback_query and update.callback_query.data == "hint_spec_name":
+        spec_name = get_last_hint(user_id, "spec_name")
+        await update.callback_query.answer()
+        await safe_edit_and_store(
+            context, update.effective_chat.id, update.callback_query.message.message_id,
+            "Введите ФИО преподавателя:",
+            reply_markup=make_hint_keyboard("fio_teacher", user_id, BACK_TO_MENU_BTN)
+        )
+    else:
+        return NEW_SPEC_NAME
+
+    context.user_data['spec_name'] = spec_name
+    save_user_hint(user_id, "spec_name", spec_name)
+    await safe_send_and_store(
+        context, update.effective_chat.id,
+        "Введите ФИО преподавателя:",
+        reply_markup=make_hint_keyboard("fio_teacher", user_id, BACK_TO_MENU_BTN)
+    )
     return NEW_TEACHER
 
 async def new_teacher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['fio_teacher'] = update.message.text
-    await safe_send_and_store(context, update.effective_chat.id, "Введите количество пунктов содержания:", reply_markup=BACK_TO_MENU_BTN)
+    user_id = update.effective_user.id
+    if update.message:
+        fio_teacher = update.message.text
+    elif update.callback_query and update.callback_query.data == "hint_fio_teacher":
+        fio_teacher = get_last_hint(user_id, "fio_teacher")
+        await update.callback_query.answer()
+        await safe_edit_and_store(
+            context, update.effective_chat.id, update.callback_query.message.message_id,
+            "Введите количество пунктов содержания:",
+            reply_markup=BACK_TO_MENU_BTN
+        )
+    else:
+        return NEW_TEACHER
+
+    context.user_data['fio_teacher'] = fio_teacher
+    save_user_hint(user_id, "fio_teacher", fio_teacher)
+    await safe_send_and_store(
+        context, update.effective_chat.id,
+        "Введите количество пунктов содержания:",
+        reply_markup=BACK_TO_MENU_BTN
+    )
     return NEW_POINTS
 
+
 async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    if update.message:
+        text = update.message.text
+    elif update.callback_query and update.callback_query.data == "hint_num_points":
+        text = get_last_hint(user_id, "num_points")
+        await update.callback_query.answer()
+    else:
+        return NEW_POINTS
+
     try:
-        num_points = int(update.message.text)
+        num_points = int(text)
         if num_points <= 0:
             raise ValueError
         context.user_data['num_points'] = num_points
+        save_user_hint(user_id, "num_points", text)
     except ValueError:
-        await safe_send_and_store(context, update.effective_chat.id, "Пожалуйста, введите натуральное число.", reply_markup=BACK_TO_MENU_BTN)
+        await safe_send_and_store(
+            context, update.effective_chat.id,
+            "Пожалуйста, введите натуральное число.",
+            reply_markup=BACK_TO_MENU_BTN
+        )
         return NEW_POINTS
 
     price = num_points * 20
