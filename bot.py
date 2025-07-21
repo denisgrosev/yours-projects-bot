@@ -924,21 +924,30 @@ async def new_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def new_spec_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
+
     if update.message:
         spec_number = update.message.text
+
     elif update.callback_query and update.callback_query.data == "hint_spec_number":
         spec_number = get_last_hint(user_id, "spec_number")
+        context.user_data['spec_number'] = spec_number
+        save_user_hint(user_id, "spec_number", spec_number)
+
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
             "Теперь введите полное название специальности:",
             reply_markup=make_hint_keyboard("spec_name", user_id, BACK_TO_MENU_BTN)
         )
+        return NEW_SPEC_NAME  # ← важно: возвращаем здесь, чтобы не упасть в send_and_store ниже
+
     else:
         return NEW_SPEC_NUMBER
 
+    # ручной ввод
     context.user_data['spec_number'] = spec_number
     save_user_hint(user_id, "spec_number", spec_number)
+
     await safe_send_and_store(
         context, update.effective_chat.id,
         "Теперь введите полное название специальности:",
@@ -948,21 +957,30 @@ async def new_spec_number(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def new_spec_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
+
     if update.message:
         spec_name = update.message.text
+
     elif update.callback_query and update.callback_query.data == "hint_spec_name":
         spec_name = get_last_hint(user_id, "spec_name")
+        context.user_data['spec_name'] = spec_name
+        save_user_hint(user_id, "spec_name", spec_name)
+
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
             "Введите ФИО преподавателя:",
             reply_markup=make_hint_keyboard("fio_teacher", user_id, BACK_TO_MENU_BTN)
         )
+        return NEW_TEACHER  # ← не даём провалиться в send_and_store ниже
+
     else:
         return NEW_SPEC_NAME
 
+    # ручной ввод
     context.user_data['spec_name'] = spec_name
     save_user_hint(user_id, "spec_name", spec_name)
+
     await safe_send_and_store(
         context, update.effective_chat.id,
         "Введите ФИО преподавателя:",
@@ -970,23 +988,33 @@ async def new_spec_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     )
     return NEW_TEACHER
 
+
 async def new_teacher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
+
     if update.message:
         fio_teacher = update.message.text
+
     elif update.callback_query and update.callback_query.data == "hint_fio_teacher":
         fio_teacher = get_last_hint(user_id, "fio_teacher")
+        context.user_data['fio_teacher'] = fio_teacher
+        save_user_hint(user_id, "fio_teacher", fio_teacher)
+
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
             "Введите количество пунктов содержания:",
             reply_markup=BACK_TO_MENU_BTN
         )
+        return NEW_POINTS  # ← строго выходим, чтобы не упасть вниз
+
     else:
         return NEW_TEACHER
 
+    # ручной ввод
     context.user_data['fio_teacher'] = fio_teacher
     save_user_hint(user_id, "fio_teacher", fio_teacher)
+
     await safe_send_and_store(
         context, update.effective_chat.id,
         "Введите количество пунктов содержания:",
@@ -997,14 +1025,41 @@ async def new_teacher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
+
     if update.message:
         text = update.message.text
+
     elif update.callback_query and update.callback_query.data == "hint_num_points":
         text = get_last_hint(user_id, "num_points")
         await update.callback_query.answer()
+
+        # Сохраняем и редактируем сообщение, без повторной отправки
+        try:
+            num_points = int(text)
+            if num_points <= 0:
+                raise ValueError
+            context.user_data['num_points'] = num_points
+            save_user_hint(user_id, "num_points", text)
+        except ValueError:
+            await safe_edit_and_store(
+                context, update.effective_chat.id, update.callback_query.message.message_id,
+                "Пожалуйста, введите натуральное число.",
+                reply_markup=BACK_TO_MENU_BTN
+            )
+            return NEW_POINTS
+
+        # Если всё ок, просто редактируем, дальше может быть логика после
+        await safe_edit_and_store(
+            context, update.effective_chat.id, update.callback_query.message.message_id,
+            f"Вы ввели количество пунктов: {num_points}",
+            reply_markup=BACK_TO_MENU_BTN
+        )
+        return NEW_POINTS  # или следующий этап, если есть
+
     else:
         return NEW_POINTS
 
+    # Ручной ввод — проверка и сохранение
     try:
         num_points = int(text)
         if num_points <= 0:
