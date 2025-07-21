@@ -867,21 +867,42 @@ def get_spec_by_group(group):
 
 async def new_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
+
     if update.message:
         group = update.message.text
+
     elif update.callback_query and update.callback_query.data == "hint_group":
         group = get_last_hint(user_id, "group")
+        context.user_data['group'] = group
+        save_user_hint(user_id, "group", group)
+
+        spec_number, spec_name = get_spec_by_group(group)
+        if not spec_number or not spec_name:
+            await update.callback_query.answer()
+            await safe_edit_and_store(
+                context, update.effective_chat.id, update.callback_query.message.message_id,
+                "Группа не определяет специальность автоматически.\nПожалуйста, введите номер специальности (например, 23.02.07):",
+                reply_markup=make_hint_keyboard("spec_number", user_id, BACK_TO_MENU_BTN)
+            )
+            return NEW_SPEC_NUMBER
+
+        context.user_data['spec_number'] = spec_number
+        context.user_data['spec_name'] = spec_name
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
             "Введите ФИО преподавателя:",
             reply_markup=make_hint_keyboard("fio_teacher", user_id, BACK_TO_MENU_BTN)
         )
+        return NEW_TEACHER
+
     else:
         return NEW_GROUP
 
+    # сюда попадаем только при ручном вводе
     context.user_data['group'] = group
     save_user_hint(user_id, "group", group)
+
     spec_number, spec_name = get_spec_by_group(group)
     if not spec_number or not spec_name:
         await safe_send_and_store(
@@ -899,6 +920,7 @@ async def new_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         reply_markup=make_hint_keyboard("fio_teacher", user_id, BACK_TO_MENU_BTN)
     )
     return NEW_TEACHER
+
 
 async def new_spec_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
