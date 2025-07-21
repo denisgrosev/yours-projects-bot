@@ -1064,10 +1064,11 @@ async def error_handler(update, context):
 def main():
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-
     new_proj_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(main_menu_handler, pattern="^new_project$"),
-                      CommandHandler("new_progect", new_progect_start)],
+        entry_points=[
+            CallbackQueryHandler(main_menu_handler, pattern="^new_project$"),
+            CommandHandler("new_progect", new_progect_start),
+        ],
         states={
             NEW_TOPIC: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, new_topic),
@@ -1081,12 +1082,26 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, new_fio),
                 CallbackQueryHandler(new_fio, pattern="^hint_fio_student$"),
             ],
-
-            NEW_GROUP: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_group)],
-            NEW_SPEC_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_spec_number)],
-            NEW_SPEC_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_spec_name)],
-            NEW_TEACHER: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_teacher)],
-            NEW_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, new_points)],
+            NEW_GROUP: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, new_group),
+                CallbackQueryHandler(new_group, pattern="^hint_group$"),
+            ],
+            NEW_SPEC_NUMBER: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, new_spec_number),
+                CallbackQueryHandler(new_spec_number, pattern="^hint_spec_number$"),
+            ],
+            NEW_SPEC_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, new_spec_name),
+                CallbackQueryHandler(new_spec_name, pattern="^hint_spec_name$"),
+            ],
+            NEW_TEACHER: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, new_teacher),
+                CallbackQueryHandler(new_teacher, pattern="^hint_fio_teacher$"),
+            ],
+            NEW_POINTS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, new_points),
+                CallbackQueryHandler(new_points, pattern="^hint_num_points$"),
+            ],
         },
         fallbacks=[
             CallbackQueryHandler(menu_callback, pattern="^menu$"),
