@@ -636,7 +636,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     args = context.args if hasattr(context, 'args') else []
     referrer_id = None
-
+    
     # Обработка реферальной ссылки
     if args and args[0].startswith('ref_'):
         try:
@@ -678,8 +678,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await clear_last_bot_keyboard(context, update.effective_chat.id)
     # Очищаем состояния
     context.user_data.clear()
+
+    # Принудительный сброс состояния conversation
+    for key in list(context.chat_data.keys()):
+        if "conversation" in key:
+            del context.chat_data[key]
+
+    
     context.chat_data.clear()
-    context.conversation_data.clear()
+    
     # Приветствие и меню
     if update.message:
         await safe_send_and_store(context, update.effective_chat.id, text, reply_markup=MAIN_MENU, parse_mode="Markdown")
@@ -716,7 +723,6 @@ async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def new_progect_start(update: Update, context: ContextTypes.DEFAULT_TYPE, from_menu=False) -> int:
     context.user_data.clear()
     context.chat_data.clear()
-    context.conversation_data.clear()
     await clear_last_bot_keyboard(context, update.effective_chat.id)
     user_id = update.effective_user.id
     reply_markup = make_hint_keyboard("topic", user_id, BACK_TO_MENU_BTN)
