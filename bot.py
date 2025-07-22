@@ -1034,12 +1034,28 @@ async def new_teacher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
 
+    # Если пользователь только пришёл на этап или отправил не валидное сообщение
     if update.message:
         text = update.message.text
+        # Попробуем преобразовать в число
+        try:
+            num_points = int(text)
+            if num_points <= 0:
+                raise ValueError
+            # Валидно, продолжаем дальше
+            context.user_data['num_points'] = num_points
+            save_user_hint(user_id, "num_points", text)
+        except ValueError:
+            # Невалидно - показываем клавиатуру снова!
+            await safe_send_and_store(
+                context, update.effective_chat.id,
+                "Пожалуйста, введите натуральное число.",
+                reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
+            )
+            return NEW_POINTS
     elif update.callback_query and update.callback_query.data == "hint_num_points":
         text = get_last_hint(user_id, "num_points")
         await update.callback_query.answer()
-        # Важно: здесь используем safe_edit_and_store!
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
             "Введите количество баллов:",
@@ -1047,9 +1063,20 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         )
         context.user_data['num_points'] = text
         save_user_hint(user_id, "num_points", text)
-        # Можно здесь завершить шаг, или оставить return ниже
+        # Здесь нет return, чтобы обработать число ниже
+        try:
+            num_points = int(text)
+            if num_points <= 0:
+                raise ValueError
+        except ValueError:
+            await safe_send_and_store(
+                context, update.effective_chat.id,
+                "Пожалуйста, введите натуральное число.",
+                reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
+            )
+            return NEW_POINTS
     else:
-        # Показываем клавиатуру с подсказкой
+        # Новый заход на этап, показываем клавиатуру
         await safe_send_and_store(
             context, update.effective_chat.id,
             "Введите количество баллов:",
@@ -1057,21 +1084,8 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         )
         return NEW_POINTS
 
-    try:
-        num_points = int(text)
-        if num_points <= 0:
-            raise ValueError
-        context.user_data['num_points'] = num_points
-        save_user_hint(user_id, "num_points", text)
-    except ValueError:
-        await safe_send_and_store(
-            context, update.effective_chat.id,
-            "Пожалуйста, введите натуральное число.",
-            reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
-        )
-        return NEW_POINTS
-
-    price = num_points * 20
+    # Если дошли сюда — число валидно, продолжаем дальше (баланс, генерация и т.д.)
+    price = int(context.user_data['num_points']) * 20
     balance = get_user_balance(user_id)
     if balance < price:
         await safe_send_and_store(
@@ -1091,10 +1105,8 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             reply_markup=BACK_TO_MENU_BTN
         )
 
-        # --- ЭТОТ КУСОК ВСТАВИТЬ ---
+        # --- запуск генератора ---
         generator_path = os.path.join(os.path.dirname(__file__), "generate_project_process.py")
-        # --- КОНЕЦ ВСТАВКИ ---
-
         subprocess.Popen([
             sys.executable, generator_path,
             "--token", TELEGRAM_BOT_TOKEN,
@@ -1112,7 +1124,6 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "--deepseek_api_key", API_KEY,
             "--admin_id", str(ADMIN_ID),
         ])
-
         return ConversationHandler.END
 
 async def error_handler(update, context):
