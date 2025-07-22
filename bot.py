@@ -403,6 +403,7 @@ async def referral_invited_callback(update: Update, context: ContextTypes.DEFAUL
     await query.answer()
     user_id = update.effective_user.id
     invited = get_invited_list(user_id)  # [(uid, uname), ...]
+    referral_link = get_referral_link(user_id)
     if invited:
         buttons = []
         for uid, uname in invited:
@@ -415,7 +416,17 @@ async def referral_invited_callback(update: Update, context: ContextTypes.DEFAUL
         text = f"У вас {len(invited)} приглашённых:\nНажми на имя для перехода их в Telegram."
         await query.edit_message_text(text, reply_markup=markup)
     else:
-        await query.edit_message_text("У тебя пока нет приглашённых. Отправь свою реферальную ссылку знакомым, чтобы получать по 20% от их пополнений", reply_markup=REFERRAL_MENU_INLINE)
+        share_link = await generate_telegram_share_link_plain(referral_link)
+        buttons = [
+            [InlineKeyboardButton("📩 Поделиться", url=share_link)],
+            [InlineKeyboardButton("⬅️ Назад", callback_data="referral_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await query.edit_message_text(
+            "У тебя пока нет приглашённых. Отправь свою реферальную ссылку знакомым, чтобы получать по 20% от их пополнений",
+            reply_markup=reply_markup
+        )
+
 
 
 async def generate_telegram_share_link_plain(link: str) -> str:
@@ -438,7 +449,7 @@ async def referral_link_callback(update: Update, context: ContextTypes.DEFAULT_T
     ])
 
     await query.edit_message_text(
-        text=f"Твоя реферальная ссылка:`\n{link}`\n*Нажми на ссылку, чтобы скопировать, либо на кнопку ниже, чтобы поделиться*",
+        text=f"Твоя реферальная ссылка:\n`\n{link}`\n\n*Нажми на ссылку, чтобы скопировать, либо на кнопку ниже, чтобы поделиться*",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
