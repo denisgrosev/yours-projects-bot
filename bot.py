@@ -196,13 +196,13 @@ async def topup_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, chat_id, update.callback_query.message.message_id,
-            "Введите сумму пополнения (например, 100):",
+            "Введи сумму пополнения в рублях. Например: 100",
             reply_markup=reply_markup
         )
     else:
         await safe_send_and_store(
             context, chat_id,
-            "Введите сумму пополнения (например, 100):",
+            "Введи сумму пополнения в рублях. Например: 100",
             reply_markup=reply_markup
         )
     return TOPUP_AMOUNT
@@ -231,7 +231,7 @@ async def handle_topup_amount(update: Update, context: ContextTypes.DEFAULT_TYPE
         save_user_hint(user_id, "amount", str(amount))
         await safe_send_and_store(
             context, chat_id,
-            "Введите ваш email для отправки чека:",
+            "Введи свой email для отправки чека",
             reply_markup=make_hint_keyboard("email", user_id, BACK_TO_MENU_BTN)
         )
         return TOPUP_EMAIL
@@ -257,7 +257,7 @@ async def handle_topup_amount(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, chat_id, update.callback_query.message.message_id,
-            "Введите ваш email для отправки чека:",
+            "Введи свой email для отправки чека",
             reply_markup=make_hint_keyboard("email", user_id, BACK_TO_MENU_BTN)
         )
         return TOPUP_EMAIL
@@ -311,7 +311,7 @@ async def handle_topup_email(update: Update, context: ContextTypes.DEFAULT_TYPE)
             ])
             await safe_send_and_store(
                 context, chat_id,
-                "Оплатите по кнопке ниже.\n\nПосле оплаты баланс пополнится автоматически.",
+                "Оплати по кнопке ниже.\n\nПосле оплаты баланс пополнится автоматически",
                 reply_markup=reply_markup
             )
         except Exception as e:
@@ -350,7 +350,7 @@ async def handle_topup_email(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await update.callback_query.answer()
             await safe_edit_and_store(
                 context, chat_id, update.callback_query.message.message_id,
-                "Оплатите по кнопке ниже.\n\nПосле оплаты баланс пополнится автоматически.",
+                "Оплати по кнопке ниже.\n\nПосле оплаты баланс пополнится автоматически",
                 reply_markup=reply_markup
             )
         except Exception as e:
@@ -380,7 +380,7 @@ async def referral_menu_callback(update: Update, context: ContextTypes.DEFAULT_T
 REFERRAL_MENU_INLINE = InlineKeyboardMarkup([
     [InlineKeyboardButton("👥 Приглашённые", callback_data="ref_invited")],
     [InlineKeyboardButton("🔗 Моя реферальная ссылка", callback_data="ref_link")],
-    [InlineKeyboardButton("💰 Мой реферальный баланс", callback_data="ref_balance")],
+    [InlineKeyboardButton("🏦 Мой реферальный баланс", callback_data="ref_balance")],
     [InlineKeyboardButton("💳 Вывести на карту", callback_data="ref_withdraw")],
     [InlineKeyboardButton("🔄 Перевести на баланс", callback_data="ref_to_main")],
     [InlineKeyboardButton("⬅️ Назад в меню", callback_data="menu")],
@@ -414,7 +414,7 @@ async def referral_invited_callback(update: Update, context: ContextTypes.DEFAUL
         text = f"У вас {len(invited)} приглашённых:\nНажмите на имя для перехода в Telegram."
         await query.edit_message_text(text, reply_markup=markup)
     else:
-        await query.edit_message_text("У вас пока нет приглашённых.", reply_markup=REFERRAL_MENU_INLINE)
+        await query.edit_message_text("У тебя пока нет приглашённых. Отправь свою реферальную ссылку знакомым, чтобы получать по 20% от их пополнений", reply_markup=REFERRAL_MENU_INLINE)
 
 async def referral_link_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -425,12 +425,11 @@ async def referral_link_callback(update: Update, context: ContextTypes.DEFAULT_T
 
     # Кнопка-ссылка + кнопка назад
     reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔗 Ваша реферальная ссылка", url=link)],
         [InlineKeyboardButton("⬅️ Назад", callback_data="referral_menu")]
     ])
 
     await query.edit_message_text(
-        text = "Ваша реферальная ссылка:\nНажмите и удерживайте, чтобы скопировать\n(На ПК нажать ПКМ по кнопке)",
+        text=f"Твоя реферальная ссылка:\n```\n{my_ref_link}\n```\n*Нажми, чтобы скопировать*",
         reply_markup=reply_markup
     )
 
@@ -452,7 +451,7 @@ async def referral_balance_callback(update: Update, context: ContextTypes.DEFAUL
         [InlineKeyboardButton("⬅️ Назад в реферальное меню", callback_data="referral_menu")]
     ])
     await query.edit_message_text(
-        f"Ваш реферальный баланс: {ref_balance}₽",
+        f"Твой реферальный баланс: {ref_balance}₽",
         reply_markup=reply_markup
     )
 
@@ -470,14 +469,14 @@ async def referral_to_main_callback(update: Update, context: ContextTypes.DEFAUL
 
     if ref_balance < 1:
         await query.edit_message_text(
-            "На вашем реферальном балансе недостаточно средств для перевода.",
+            "На твоем реферальном балансе недостаточно средств для перевода.",
             reply_markup=reply_markup
         )
         return ConversationHandler.END
 
     await query.edit_message_text(
-        f"Ваш реферальный баланс: {ref_balance}₽\n\n"
-        "Введите сумму для перевода на основной баланс:",
+        f"Твой реферальный баланс: {ref_balance}₽\n\n"
+        "Введи сумму для перевода на основной баланс:",
         reply_markup=reply_markup
     )
     context.user_data['ref_balance'] = ref_balance
@@ -512,7 +511,7 @@ async def referral_to_main_amount(update: Update, context: ContextTypes.DEFAULT_
     set_ref_balance(user_id, ref_balance - amount)
 
     await update.message.reply_text(
-        f"{amount}₽ успешно переведено на ваш основной баланс.",
+        f"{amount}₽ успешно переведено на твой основной баланс.",
         reply_markup=reply_markup
     )
     return ConversationHandler.END
@@ -528,12 +527,12 @@ async def referral_withdraw_callback(update, context):
     ref_balance = get_ref_balance(update.effective_user.id)
     if ref_balance < 1:
         await update.callback_query.edit_message_text(
-            "На вашем реферальном балансе недостаточно средств.",
+            "На твое реферальном балансе недостаточно средств.",
             reply_markup=referral_menu_markup()
         )
         return ConversationHandler.END
     await update.callback_query.edit_message_text(
-        f"На вашем реферальном балансе {ref_balance}₽.\n\nВведите сумму для вывода:",
+        f"На твоем реферальном балансе {ref_balance}₽.\n\nВведи сумму для вывода:",
         reply_markup=referral_menu_markup()
     )
     return REF_WITHDRAW_SUM
@@ -607,14 +606,14 @@ async def referral_admin_callback(update, context):
         set_ref_balance(user_id, get_ref_balance(user_id) - amount)
         await context.bot.send_message(
             user_id,
-            f"✅ Ваша заявка на вывод {amount}₽ с реферального баланса успешно обработана!",
+            f"✅ Твоя заявка на вывод {amount}₽ с реферального баланса успешно обработана!",
             reply_markup=referral_menu_markup()
         )
         await query.edit_message_text("✅ Заявка отмечена как выполненная.")
     elif action == "decline":
         await context.bot.send_message(
             user_id,
-            "❌ Ваша заявка на вывод с реферального баланса отклонена модератором.",
+            "❌ Твоя заявка на вывод с реферального баланса отклонена модератором.",
             reply_markup=referral_menu_markup()
         )
         await query.edit_message_text("❌ Заявка отклонена.")
@@ -771,14 +770,14 @@ async def new_progect_start(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             context,
             update.effective_chat.id,
             update.callback_query.message.message_id,
-            "Введите тему проекта:",
+            "Отправь мне тему своего проекта",
             reply_markup=reply_markup
         )
     else:
         await safe_send_and_store(
             context,
             update.effective_chat.id,
-            "Введите тему проекта:",
+            "Отправь мне тему своего проекта",
             reply_markup=reply_markup
         )
     return NEW_TOPIC
@@ -815,9 +814,9 @@ async def topup_balance_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await clear_last_bot_keyboard(context, update.effective_chat.id)
     if update.callback_query:
         await safe_edit_and_store(context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Введите сумму пополнения (например, 100):", reply_markup=BACK_TO_MENU_BTN)
+            "Введи сумму пополнения в рублях. Например: 100", reply_markup=BACK_TO_MENU_BTN)
     else:
-        await safe_send_and_store(context, update.effective_chat.id, "Введите сумму пополнения (например, 100):", reply_markup=BACK_TO_MENU_BTN)
+        await safe_send_and_store(context, update.effective_chat.id, "Введи сумму пополнения в рублях. Например: 100", reply_markup=BACK_TO_MENU_BTN)
     return TOPUP_AMOUNT
 
 # ========== ДАЛЬШЕ ВСЁ СТАНДАРТНО, КРОМЕ ДОБАВЛЕНИЯ reply_markup=BACK_TO_MENU_BTN в safe_send_message там где вручную ==========
@@ -835,7 +834,7 @@ async def new_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         save_user_hint(user_id, "topic", topic)
         await safe_send_and_store(
             context, update.effective_chat.id, 
-            "Введите предмет:", 
+            "Отправь предмет, по которому готовишь проект", 
             reply_markup=make_hint_keyboard("subject", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_SUBJECT
@@ -846,7 +845,7 @@ async def new_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Введите предмет:",
+            "Отправь предмет, по которому готовишь проект",
             reply_markup=make_hint_keyboard("subject", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_SUBJECT
@@ -859,7 +858,7 @@ async def new_subject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         save_user_hint(user_id, "subject", subject)
         await safe_send_and_store(
             context, update.effective_chat.id,
-            "Введите ФИО обучающегося:",
+            "Отправь мне свое ФИО. (Для титулки)",
             reply_markup=make_hint_keyboard("fio_student", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_FIO
@@ -870,7 +869,7 @@ async def new_subject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Введите ФИО обучающегося:",
+            "Отправь мне свое ФИО. (Для титулки)",
             reply_markup=make_hint_keyboard("fio_student", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_FIO
@@ -883,7 +882,7 @@ async def new_fio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         save_user_hint(user_id, "fio_student", fio)
         await safe_send_and_store(
             context, update.effective_chat.id,
-            "Введите группу:",
+            "Отправь группу, в которой учишься. (Для титулки)",
             reply_markup=make_hint_keyboard("group", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_GROUP
@@ -894,7 +893,7 @@ async def new_fio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Введите группу:",
+            "Отправь группу, в которой учишься. (Для титулки)",
             reply_markup=make_hint_keyboard("group", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_GROUP
@@ -928,7 +927,7 @@ async def new_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             await update.callback_query.answer()
             await safe_edit_and_store(
                 context, update.effective_chat.id, update.callback_query.message.message_id,
-                "Группа не определяет специальность автоматически.\nПожалуйста, введите номер специальности (например, 23.02.07):",
+                "Отправь код своей специальности, по ФГОС. Например: 23.02.07",
                 reply_markup=make_hint_keyboard("spec_number", user_id, BACK_TO_MENU_BTN)
             )
             return NEW_SPEC_NUMBER
@@ -938,7 +937,7 @@ async def new_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Введите ФИО преподавателя:",
+            "Введи ФИО преподавателя",
             reply_markup=make_hint_keyboard("fio_teacher", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_TEACHER
@@ -954,7 +953,7 @@ async def new_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not spec_number or not spec_name:
         await safe_send_and_store(
             context, update.effective_chat.id,
-            "Группа не определяет специальность автоматически.\nПожалуйста, введите номер специальности (например, 23.02.07):",
+            "Отправь код своей специальности, по ФГОС. Например: 23.02.07",
             reply_markup=make_hint_keyboard("spec_number", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_SPEC_NUMBER
@@ -963,7 +962,7 @@ async def new_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['spec_name'] = spec_name
     await safe_send_and_store(
         context, update.effective_chat.id,
-        "Введите ФИО преподавателя:",
+        "Введи ФИО преподавателя",
         reply_markup=make_hint_keyboard("fio_teacher", user_id, BACK_TO_MENU_BTN)
     )
     return NEW_TEACHER
@@ -983,7 +982,7 @@ async def new_spec_number(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Теперь введите полное название специальности:",
+            "Теперь введи полное название специальности, по ФГОС. Например: Техническое обслуживание и ремонт двигателей, систем и агрегатов автомобилей",
             reply_markup=make_hint_keyboard("spec_name", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_SPEC_NAME  # ← важно: возвращаем здесь, чтобы не упасть в send_and_store ниже
@@ -997,7 +996,7 @@ async def new_spec_number(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     await safe_send_and_store(
         context, update.effective_chat.id,
-        "Теперь введите полное название специальности:",
+        "Теперь введи полное название специальности, по ФГОС. Например: Техническое обслуживание и ремонт двигателей, систем и агрегатов автомобилей",
         reply_markup=make_hint_keyboard("spec_name", user_id, BACK_TO_MENU_BTN)
     )
     return NEW_SPEC_NAME
@@ -1016,7 +1015,7 @@ async def new_spec_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Введите ФИО преподавателя:",
+            "Введи ФИО преподавателя",
             reply_markup=make_hint_keyboard("fio_teacher", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_TEACHER  # ← не даём провалиться в send_and_store ниже
@@ -1030,7 +1029,7 @@ async def new_spec_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
     await safe_send_and_store(
         context, update.effective_chat.id,
-        "Введите ФИО преподавателя:",
+        "Введи ФИО преподавателя",
         reply_markup=make_hint_keyboard("fio_teacher", user_id, BACK_TO_MENU_BTN)
     )
     return NEW_TEACHER
@@ -1045,7 +1044,7 @@ async def new_teacher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         save_user_hint(user_id, "fio_teacher", fio_teacher)
         await safe_send_and_store(
             context, update.effective_chat.id,
-            "Введите количество пунктов содержания:",
+            "Введи количество разделов. 1 раздел",
             reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_POINTS
@@ -1057,7 +1056,7 @@ async def new_teacher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Введите количество пунктов содержания:",
+            "Введи количество разделов проекта. 1 раздел = 20 ₽ (~1,5 страницы текста)",
             reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_POINTS
@@ -1073,7 +1072,7 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not (update.message or (update.callback_query and update.callback_query.data == "hint_num_points")):
         await safe_send_and_store(
             context, update.effective_chat.id,
-            "Введите количество пунктов содержания:",
+            "Введи количество разделов проекта. 1 раздел = 20 ₽ (~1,5 страницы текста)",
             reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_POINTS
@@ -1089,7 +1088,7 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         except ValueError:
             await safe_send_and_store(
                 context, update.effective_chat.id,
-                "Пожалуйста, введите натуральное число.",
+                "Введи натуральное число. Например: 1, 2, 3 и т.д.",
                 reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
             )
             return NEW_POINTS
@@ -1099,7 +1098,7 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Введите количество пунктов содержания:",
+            "Введи количество разделов проекта. 1 раздел = 20 ₽ (~1,5 страницы текста)",
             reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
         )
         context.user_data['num_points'] = text
@@ -1111,7 +1110,7 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         except ValueError:
             await safe_send_and_store(
                 context, update.effective_chat.id,
-                "Пожалуйста, введите натуральное число.",
+                "Введи натуральное число. Например: 1, 2, 3 и т.д.",
                 reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
             )
             return NEW_POINTS
@@ -1122,9 +1121,9 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if balance < price:
         await safe_send_and_store(
             context, update.effective_chat.id,
-            f"На вашем балансе недостаточно средств ({balance}₽ / {price}₽).\nПополните баланс кнопкой ниже.",
+            f"На твоем балансе недостаточно средств ({balance}₽ / {price}₽).\nПополни баланс кнопкой ниже и попробуй снова",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("➕ Пополнить баланс", callback_data="topup")],
+                [InlineKeyboardButton("💳 Пополнить баланс", callback_data="topup")],
                 [InlineKeyboardButton("⬅️ Назад в меню", callback_data="menu")]
             ])
         )
@@ -1133,7 +1132,7 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         deduct_user_balance(user_id, price)
         await safe_send_and_store(
             context, update.effective_chat.id,
-            f"С вашего баланса списано {price}₽. Остаток: {get_user_balance(user_id)}₽.\nГенерация проекта начата!",
+            f"Генерация проекта начата",
             reply_markup=BACK_TO_MENU_BTN
         )
 
