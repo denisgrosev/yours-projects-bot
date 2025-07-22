@@ -429,7 +429,7 @@ async def referral_link_callback(update: Update, context: ContextTypes.DEFAULT_T
     ])
 
     await query.edit_message_text(
-        text=f"Твоя реферальная ссылка:\n```\n{my_ref_link}\n```\n*Нажми, чтобы скопировать*",
+        text=f"Твоя реферальная ссылка:\n```\n{link}\n```\n*Нажми, чтобы скопировать*",
         reply_markup=reply_markup
     )
 
@@ -770,14 +770,14 @@ async def new_progect_start(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             context,
             update.effective_chat.id,
             update.callback_query.message.message_id,
-            "Отправь мне тему своего проекта",
+            "Отправь мне тему, по которой пишешь проект",
             reply_markup=reply_markup
         )
     else:
         await safe_send_and_store(
             context,
             update.effective_chat.id,
-            "Отправь мне тему своего проекта",
+            "Отправь мне тему, по которой пишешь проект",
             reply_markup=reply_markup
         )
     return NEW_TOPIC
