@@ -429,7 +429,7 @@ async def referral_link_callback(update: Update, context: ContextTypes.DEFAULT_T
     ])
 
     await query.edit_message_text(
-        text=f"Твоя реферальная ссылка:\n```\n{link}\n```\n*Нажми, чтобы скопировать*",
+        text=f"Твоя реферальная ссылка:\n`\n{link}\n`\n*Нажми, чтобы скопировать*",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
