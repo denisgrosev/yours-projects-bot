@@ -1002,68 +1002,62 @@ async def new_teacher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
     if update.message:
         fio_teacher = update.message.text
+        context.user_data['fio_teacher'] = fio_teacher
+        save_user_hint(user_id, "fio_teacher", fio_teacher)
+        # НЕ отправляем сообщение здесь!
+        return NEW_POINTS
 
     elif update.callback_query and update.callback_query.data == "hint_fio_teacher":
         fio_teacher = get_last_hint(user_id, "fio_teacher")
         context.user_data['fio_teacher'] = fio_teacher
         save_user_hint(user_id, "fio_teacher", fio_teacher)
-
         await update.callback_query.answer()
-        await safe_edit_and_store(
-            context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Введите количество пунктов содержания:",
-            reply_markup=BACK_TO_MENU_BTN
-        )
-        return NEW_POINTS  # ← строго выходим, чтобы не упасть вниз
+        # НЕ отправляем сообщение здесь!
+        return NEW_POINTS
 
     else:
         return NEW_TEACHER
-
-    # ручной ввод
-    context.user_data['fio_teacher'] = fio_teacher
-    save_user_hint(user_id, "fio_teacher", fio_teacher)
-
-    await safe_send_and_store(
-        context, update.effective_chat.id,
-        "Введите количество пунктов содержания:",
-        reply_markup=BACK_TO_MENU_BTN
-    )
-    return NEW_POINTS
 
 
 async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
 
-    # Если пользователь только пришёл на этап или отправил не валидное сообщение
+    # Если пользователь только пришёл на этап (после new_teacher), показываем клавиатуру с подсказками
+    # Это ветка, срабатывающая при первом заходе на этап
+    if not (update.message or (update.callback_query and update.callback_query.data == "hint_num_points")):
+        await safe_send_and_store(
+            context, update.effective_chat.id,
+            "Введите количество пунктов содержания:",
+            reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
+        )
+        return NEW_POINTS
+
     if update.message:
         text = update.message.text
-        # Попробуем преобразовать в число
         try:
             num_points = int(text)
             if num_points <= 0:
                 raise ValueError
-            # Валидно, продолжаем дальше
             context.user_data['num_points'] = num_points
             save_user_hint(user_id, "num_points", text)
         except ValueError:
-            # Невалидно - показываем клавиатуру снова!
             await safe_send_and_store(
                 context, update.effective_chat.id,
                 "Пожалуйста, введите натуральное число.",
                 reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
             )
             return NEW_POINTS
+
     elif update.callback_query and update.callback_query.data == "hint_num_points":
         text = get_last_hint(user_id, "num_points")
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
-            "Введите количество баллов:",
+            "Введите количество пунктов содержания:",
             reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
         )
         context.user_data['num_points'] = text
         save_user_hint(user_id, "num_points", text)
-        # Здесь нет return, чтобы обработать число ниже
         try:
             num_points = int(text)
             if num_points <= 0:
@@ -1075,14 +1069,6 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
             )
             return NEW_POINTS
-    else:
-        # Новый заход на этап, показываем клавиатуру
-        await safe_send_and_store(
-            context, update.effective_chat.id,
-            "Введите количество баллов:",
-            reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
-        )
-        return NEW_POINTS
 
     # Если дошли сюда — число валидно, продолжаем дальше (баланс, генерация и т.д.)
     price = int(context.user_data['num_points']) * 20
