@@ -403,7 +403,8 @@ async def referral_invited_callback(update: Update, context: ContextTypes.DEFAUL
     await query.answer()
     user_id = update.effective_user.id
     invited = get_invited_list(user_id)  # [(uid, uname), ...]
-    referral_link = get_referral_link(user_id)
+    bot_username = context.bot.username
+    referral_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
     if invited:
         buttons = []
         for uid, uname in invited:
@@ -413,7 +414,7 @@ async def referral_invited_callback(update: Update, context: ContextTypes.DEFAUL
             buttons.append([InlineKeyboardButton(btn_text, url=tg_link)])
         buttons.append([InlineKeyboardButton("⬅️ Назад", callback_data="referral_menu")])
         markup = InlineKeyboardMarkup(buttons)
-        text = f"У вас {len(invited)} приглашённых:\nНажми на имя для перехода их в Telegram."
+        text = f"У тебя {len(invited)} приглашённых:\nНажми на имя для перехода их в Telegram."
         await query.edit_message_text(text, reply_markup=markup)
     else:
         share_link = await generate_telegram_share_link_plain(referral_link)
