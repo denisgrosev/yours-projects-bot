@@ -1004,7 +1004,11 @@ async def new_teacher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         fio_teacher = update.message.text
         context.user_data['fio_teacher'] = fio_teacher
         save_user_hint(user_id, "fio_teacher", fio_teacher)
-        # НЕ отправляем сообщение здесь!
+        await safe_send_and_store(
+            context, update.effective_chat.id,
+            "Введите количество пунктов содержания:",
+            reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
+        )
         return NEW_POINTS
 
     elif update.callback_query and update.callback_query.data == "hint_fio_teacher":
@@ -1012,7 +1016,11 @@ async def new_teacher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         context.user_data['fio_teacher'] = fio_teacher
         save_user_hint(user_id, "fio_teacher", fio_teacher)
         await update.callback_query.answer()
-        # НЕ отправляем сообщение здесь!
+        await safe_edit_and_store(
+            context, update.effective_chat.id, update.callback_query.message.message_id,
+            "Введите количество пунктов содержания:",
+            reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
+        )
         return NEW_POINTS
 
     else:
@@ -1023,7 +1031,6 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
 
     # Если пользователь только пришёл на этап (после new_teacher), показываем клавиатуру с подсказками
-    # Это ветка, срабатывающая при первом заходе на этап
     if not (update.message or (update.callback_query and update.callback_query.data == "hint_num_points")):
         await safe_send_and_store(
             context, update.effective_chat.id,
