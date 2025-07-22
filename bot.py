@@ -122,7 +122,7 @@ BACK_TO_MENU_BTN = InlineKeyboardButton("⬅️ Назад в меню", callbac
 async def referral_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_send_and_store(
         context, update.effective_chat.id,
-        "Меню реферальной системы. Выберите действие:",
+        "Меню реферальной системы. Выбери действие:",
         reply_markup=REFERRAL_MENU
     )
 
@@ -382,10 +382,16 @@ REFERRAL_MENU_INLINE = InlineKeyboardMarkup([
     [InlineKeyboardButton("👥 Приглашённые", callback_data="ref_invited")],
     [InlineKeyboardButton("🔗 Моя реферальная ссылка", callback_data="ref_link")],
     [InlineKeyboardButton("🏦 Мой реферальный баланс", callback_data="ref_balance")],
-    [InlineKeyboardButton("💳 Вывести на карту", callback_data="ref_withdraw")],
-    [InlineKeyboardButton("🔄 Перевести на баланс", callback_data="ref_to_main")],
     [InlineKeyboardButton("⬅️ Назад в меню", callback_data="menu")],
 ])
+
+
+def referral_balance_menu_markup():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("💳 Вывести на карту", callback_data="ref_withdraw")],
+        [InlineKeyboardButton("🔄 Перевести на баланс", callback_data="ref_to_main")],
+        [InlineKeyboardButton("⬅️ Назад в реферальное меню", callback_data="referral_menu")]
+    ])
 
 def load_balances():
     """Загружает словарь балансов пользователей из user_balances.json."""
@@ -469,9 +475,8 @@ async def referral_balance_callback(update: Update, context: ContextTypes.DEFAUL
     await query.answer()
     user_id = query.from_user.id
     ref_balance = get_ref_balance(user_id)
-    reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⬅️ Назад в реферальное меню", callback_data="referral_menu")]
-    ])
+    # теперь показываем меню с кнопками "вывести на карту" и "перевести на баланс"
+    reply_markup = referral_balance_menu_markup()
     await query.edit_message_text(
         f"Твой реферальный баланс: {ref_balance}₽",
         reply_markup=reply_markup
