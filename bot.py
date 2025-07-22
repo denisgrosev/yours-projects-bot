@@ -6,6 +6,7 @@ import asyncio
 import re
 import shutil
 import subprocess
+import urllib.parse
 from datetime import datetime
 from docx.shared import Pt, Cm
 from docx.enum.text import WD_BREAK
@@ -416,20 +417,28 @@ async def referral_invited_callback(update: Update, context: ContextTypes.DEFAUL
     else:
         await query.edit_message_text("У тебя пока нет приглашённых. Отправь свою реферальную ссылку знакомым, чтобы получать по 20% от их пополнений", reply_markup=REFERRAL_MENU_INLINE)
 
+
+async def generate_telegram_share_link_plain(link: str) -> str:
+    encoded_link = urllib.parse.quote(link)
+    return f"https://t.me/share/url?url={encoded_link}"
+
+
 async def referral_link_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
     bot_username = context.bot.username
     link = f"https://t.me/{bot_username}?start=ref_{user_id}"
-
+    share_link = await generate_telegram_share_link_plain(link)
     # Кнопка-ссылка + кнопка назад
+
     reply_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📩 Поделиться", url=share_link)],
         [InlineKeyboardButton("⬅️ Назад", callback_data="referral_menu")]
     ])
 
     await query.edit_message_text(
-        text=f"Твоя реферальная ссылка:\n`\n{link}\n`\n*Нажми, чтобы скопировать*",
+        text=f"Твоя реферальная ссылка:`\n{link}`\n*Нажми на ссылку, чтобы скопировать, либо на кнопку ниже, чтобы поделиться*",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
