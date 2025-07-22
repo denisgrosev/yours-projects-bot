@@ -633,10 +633,12 @@ topup_conv = ConversationHandler(
     ],
     states={
         TOPUP_AMOUNT: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_topup_amount)
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_topup_amount),
+            CallbackQueryHandler(handle_topup_amount, pattern="^hint_amount$"),
         ],
         TOPUP_EMAIL: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_topup_email)
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_topup_email),
+            CallbackQueryHandler(handle_topup_email, pattern="^hint_email$"),
         ],
     },
     fallbacks=[
