@@ -1036,38 +1036,27 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if update.message:
         text = update.message.text
-
     elif update.callback_query and update.callback_query.data == "hint_num_points":
         text = get_last_hint(user_id, "num_points")
         await update.callback_query.answer()
-
-        # Сохраняем и редактируем сообщение, без повторной отправки
-        try:
-            num_points = int(text)
-            if num_points <= 0:
-                raise ValueError
-            context.user_data['num_points'] = num_points
-            save_user_hint(user_id, "num_points", text)
-        except ValueError:
-            await safe_edit_and_store(
-                context, update.effective_chat.id, update.callback_query.message.message_id,
-                "Пожалуйста, введите натуральное число.",
-                reply_markup=BACK_TO_MENU_BTN
-            )
-            return NEW_POINTS
-
-        # Если всё ок, просто редактируем, дальше может быть логика после
+        # Важно: здесь используем safe_edit_and_store!
         await safe_edit_and_store(
             context, update.effective_chat.id, update.callback_query.message.message_id,
-            f"Вы ввели количество пунктов: {num_points}",
-            reply_markup=BACK_TO_MENU_BTN
+            "Введите количество баллов:",
+            reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
         )
-        return NEW_POINTS  # или следующий этап, если есть
-
+        context.user_data['num_points'] = text
+        save_user_hint(user_id, "num_points", text)
+        # Можно здесь завершить шаг, или оставить return ниже
     else:
+        # Показываем клавиатуру с подсказкой
+        await safe_send_and_store(
+            context, update.effective_chat.id,
+            "Введите количество баллов:",
+            reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
+        )
         return NEW_POINTS
 
-    # Ручной ввод — проверка и сохранение
     try:
         num_points = int(text)
         if num_points <= 0:
@@ -1078,12 +1067,11 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await safe_send_and_store(
             context, update.effective_chat.id,
             "Пожалуйста, введите натуральное число.",
-            reply_markup=BACK_TO_MENU_BTN
+            reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_POINTS
 
     price = num_points * 20
-    user_id = update.effective_user.id
     balance = get_user_balance(user_id)
     if balance < price:
         await safe_send_and_store(
@@ -1104,7 +1092,6 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         )
 
         # --- ЭТОТ КУСОК ВСТАВИТЬ ---
-        # Путь до скрипта генерации
         generator_path = os.path.join(os.path.dirname(__file__), "generate_project_process.py")
         # --- КОНЕЦ ВСТАВКИ ---
 
@@ -1127,7 +1114,6 @@ async def new_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         ])
 
         return ConversationHandler.END
-
 
 async def error_handler(update, context):
     logger.error(f"Exception: {context.error}")
