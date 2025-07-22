@@ -232,7 +232,7 @@ async def handle_topup_amount(update: Update, context: ContextTypes.DEFAULT_TYPE
         await safe_send_and_store(
             context, chat_id,
             "Введите ваш email для отправки чека:",
-            reply_markup=BACK_TO_MENU_BTN
+            reply_markup=make_hint_keyboard("email", user_id, BACK_TO_MENU_BTN)
         )
         return TOPUP_EMAIL
 
@@ -258,7 +258,7 @@ async def handle_topup_amount(update: Update, context: ContextTypes.DEFAULT_TYPE
         await safe_edit_and_store(
             context, chat_id, update.callback_query.message.message_id,
             "Введите ваш email для отправки чека:",
-            reply_markup=BACK_TO_MENU_BTN
+            reply_markup=make_hint_keyboard("email", user_id, BACK_TO_MENU_BTN)
         )
         return TOPUP_EMAIL
 
