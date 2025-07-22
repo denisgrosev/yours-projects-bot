@@ -411,7 +411,7 @@ async def referral_invited_callback(update: Update, context: ContextTypes.DEFAUL
             buttons.append([InlineKeyboardButton(btn_text, url=tg_link)])
         buttons.append([InlineKeyboardButton("⬅️ Назад", callback_data="referral_menu")])
         markup = InlineKeyboardMarkup(buttons)
-        text = f"У вас {len(invited)} приглашённых:\nНажмите на имя для перехода в Telegram."
+        text = f"У вас {len(invited)} приглашённых:\nНажми на имя для перехода их в Telegram."
         await query.edit_message_text(text, reply_markup=markup)
     else:
         await query.edit_message_text("У тебя пока нет приглашённых. Отправь свою реферальную ссылку знакомым, чтобы получать по 20% от их пополнений", reply_markup=REFERRAL_MENU_INLINE)
@@ -430,7 +430,8 @@ async def referral_link_callback(update: Update, context: ContextTypes.DEFAULT_T
 
     await query.edit_message_text(
         text=f"Твоя реферальная ссылка:\n```\n{link}\n```\n*Нажми, чтобы скопировать*",
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
     )
 
 def get_ref_balance(user_id):
