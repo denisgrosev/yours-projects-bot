@@ -189,69 +189,86 @@ async def safe_edit_and_store(context, chat_id, message_id, *args, **kwargs):
 async def topup_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     update_user_info_from_update(update)
     chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
     await clear_last_bot_keyboard(context, chat_id)
+    reply_markup = make_hint_keyboard("amount", user_id, BACK_TO_MENU_BTN)
     if update.callback_query:
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, chat_id, update.callback_query.message.message_id,
             "Введите сумму пополнения (например, 100):",
-            reply_markup=BACK_TO_MENU_BTN
+            reply_markup=reply_markup
         )
     else:
         await safe_send_and_store(
             context, chat_id,
             "Введите сумму пополнения (например, 100):",
-            reply_markup=BACK_TO_MENU_BTN
+            reply_markup=reply_markup
         )
     return TOPUP_AMOUNT
 
 async def handle_topup_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     await clear_last_bot_keyboard(context, chat_id)
-    text = update.message.text
-    # Проверка суммы
-    try:
-        amount = float(text.replace(",", "."))
-        if amount < 10:
-            raise ValueError
-    except Exception:
-        if update.callback_query:
+
+    # Обработка ручного ввода суммы
+    if update.message:
+        text = update.message.text
+        try:
+            amount = float(text.replace(",", "."))
+            if amount < 10:
+                raise ValueError
+        except Exception:
+            await safe_send_and_store(
+                context, chat_id,
+                "Пожалуйста, введите сумму (минимум 10 руб):",
+                reply_markup=make_hint_keyboard("amount", user_id, BACK_TO_MENU_BTN)
+            )
+            return TOPUP_AMOUNT
+
+        context.user_data["amount"] = amount
+        save_user_hint(user_id, "amount", str(amount))
+        await safe_send_and_store(
+            context, chat_id,
+            "Введите ваш email для отправки чека:",
+            reply_markup=BACK_TO_MENU_BTN
+        )
+        return TOPUP_EMAIL
+
+    # Обработка нажатия на подсказку для суммы
+    elif update.callback_query and update.callback_query.data == "hint_amount":
+        amount_text = get_last_hint(user_id, "amount")
+        try:
+            amount = float(amount_text.replace(",", "."))
+            if amount < 10:
+                raise ValueError
+        except Exception:
             await update.callback_query.answer()
             await safe_edit_and_store(
                 context, chat_id, update.callback_query.message.message_id,
                 "Пожалуйста, введите сумму (минимум 10 руб):",
-                reply_markup=BACK_TO_MENU_BTN
+                reply_markup=make_hint_keyboard("amount", user_id, BACK_TO_MENU_BTN)
             )
-        else:
-            await safe_send_and_store(
-                context, chat_id,
-                "Пожалуйста, введите сумму (минимум 10 руб):",
-                reply_markup=BACK_TO_MENU_BTN
-            )
-        return TOPUP_AMOUNT
+            return TOPUP_AMOUNT
 
-    context.user_data["amount"] = amount
-
-    if update.callback_query:
+        context.user_data["amount"] = amount
+        save_user_hint(user_id, "amount", str(amount))
         await update.callback_query.answer()
         await safe_edit_and_store(
             context, chat_id, update.callback_query.message.message_id,
             "Введите ваш email для отправки чека:",
             reply_markup=BACK_TO_MENU_BTN
         )
-    else:
-        await safe_send_and_store(
-            context, chat_id,
-            "Введите ваш email для отправки чека:",
-            reply_markup=BACK_TO_MENU_BTN
-        )
-    return TOPUP_EMAIL
+        return TOPUP_EMAIL
 
 async def handle_topup_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     await clear_last_bot_keyboard(context, chat_id)
-    email = update.message.text.strip()
     amount = context.user_data.get("amount")
+
+    # Проверка наличия суммы
     if amount is None:
         if update.callback_query:
             await update.callback_query.answer()
@@ -269,63 +286,83 @@ async def handle_topup_email(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data.pop("amount", None)
         return ConversationHandler.END
 
-    if not is_valid_email(email):
-        if update.callback_query:
+    # Ручной ввод email
+    if update.message:
+        email = update.message.text.strip()
+        if not is_valid_email(email):
+            await safe_send_and_store(
+                context, chat_id,
+                "Пожалуйста, введите корректный email (например, name@example.com):",
+                reply_markup=make_hint_keyboard("email", user_id, BACK_TO_MENU_BTN)
+            )
+            return TOPUP_EMAIL
+
+        context.user_data["email"] = email
+        save_user_hint(user_id, "email", email)
+        # Далее создание платежа и переход к оплате
+        try:
+            description = f"Пополнение баланса для Telegram user_id {user_id}"
+            payment = create_payment(amount, description, BOT_RETURN_URL, user_id, email)
+            pay_url = payment["confirmation"]["confirmation_url"]
+
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton("💳 Оплатить", url=pay_url)],
+                [InlineKeyboardButton("⬅️ Назад в меню", callback_data="menu")]
+            ])
+            await safe_send_and_store(
+                context, chat_id,
+                "Оплатите по кнопке ниже.\n\nПосле оплаты баланс пополнится автоматически.",
+                reply_markup=reply_markup
+            )
+        except Exception as e:
+            logger.error(f"Ошибка при создании платежа: {e}")
+            await safe_send_and_store(
+                context, chat_id,
+                f"Ошибка при создании платежа: {e}",
+                reply_markup=BACK_TO_MENU_BTN
+            )
+        context.user_data.pop("amount", None)
+        return ConversationHandler.END
+
+    # Нажатие на подсказку (hint_email)
+    elif update.callback_query and update.callback_query.data == "hint_email":
+        email = get_last_hint(user_id, "email")
+        if not is_valid_email(email):
             await update.callback_query.answer()
             await safe_edit_and_store(
                 context, chat_id, update.callback_query.message.message_id,
                 "Пожалуйста, введите корректный email (например, name@example.com):",
-                reply_markup=BACK_TO_MENU_BTN
+                reply_markup=make_hint_keyboard("email", user_id, BACK_TO_MENU_BTN)
             )
-        else:
-            await safe_send_and_store(
-                context, chat_id,
-                "Пожалуйста, введите корректный email (например, name@example.com):",
-                reply_markup=BACK_TO_MENU_BTN
-            )
-        return TOPUP_EMAIL
+            return TOPUP_EMAIL
 
-    try:
-        user_id = update.effective_user.id
-        description = f"Пополнение баланса для Telegram user_id {user_id}"
-        payment = create_payment(amount, description, BOT_RETURN_URL, user_id, email)
-        pay_url = payment["confirmation"]["confirmation_url"]
+        context.user_data["email"] = email
+        save_user_hint(user_id, "email", email)
+        try:
+            description = f"Пополнение баланса для Telegram user_id {user_id}"
+            payment = create_payment(amount, description, BOT_RETURN_URL, user_id, email)
+            pay_url = payment["confirmation"]["confirmation_url"]
 
-        reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("💳 Оплатить", url=pay_url)],
-            [InlineKeyboardButton("⬅️ Назад в меню", callback_data="menu")]
-        ])
-        if update.callback_query:
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton("💳 Оплатить", url=pay_url)],
+                [InlineKeyboardButton("⬅️ Назад в меню", callback_data="menu")]
+            ])
             await update.callback_query.answer()
             await safe_edit_and_store(
                 context, chat_id, update.callback_query.message.message_id,
                 "Оплатите по кнопке ниже.\n\nПосле оплаты баланс пополнится автоматически.",
                 reply_markup=reply_markup
             )
-        else:
-            await safe_send_and_store(
-                context, chat_id,
-                "Оплатите по кнопке ниже.\n\nПосле оплаты баланс пополнится автоматически.",
-                reply_markup=reply_markup
-            )
-    except Exception as e:
-        logger.error(f"Ошибка при создании платежа: {e}")
-        if update.callback_query:
+        except Exception as e:
+            logger.error(f"Ошибка при создании платежа: {e}")
             await update.callback_query.answer()
             await safe_edit_and_store(
                 context, chat_id, update.callback_query.message.message_id,
                 f"Ошибка при создании платежа: {e}",
                 reply_markup=BACK_TO_MENU_BTN
             )
-        else:
-            await safe_send_and_store(
-                context, chat_id,
-                f"Ошибка при создании платежа: {e}",
-                reply_markup=BACK_TO_MENU_BTN
-            )
-
-    context.user_data.pop("amount", None)
-    return ConversationHandler.END
+        context.user_data.pop("amount", None)
+        return ConversationHandler.END
 
 # ===============================================
 
