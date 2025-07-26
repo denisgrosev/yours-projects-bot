@@ -240,19 +240,25 @@ async def welcome_menu_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
     elif step == "example_skip":
         log_event("example_skip", chat_id=chat_id)
-        from bot import start  # или корректно импортируй из bot
+        from bot import start
         await context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
-        # Создай временный update без message/callback_query.message
-        class DummyUpdate:
-            def __init__(self, chat, user):
-                self.effective_chat = chat
-                self.effective_user = user
-                self.message = None
-                self.callback_query = None
-        dummy_update = DummyUpdate(update.effective_chat, update.effective_user)
-        await start(dummy_update, context)
+        log_event("before_start_call", chat_id=chat_id)
+        try:
+            class DummyUpdate:
+                def __init__(self, chat, user):
+                    self.effective_chat = chat
+                    self.effective_user = user
+                    self.message = None
+                    self.callback_query = None
+            dummy_update = DummyUpdate(update.effective_chat, update.effective_user)
+            await start(dummy_update, context)
+            log_event("after_start_call", chat_id=chat_id)
+        except Exception as e:
+            log_event("start_call_exception", chat_id=chat_id, error=str(e))
         context.user_data["welcome_step"] = "hello"
+    
 
+    
     else:
         log_event("fallback", chat_id=chat_id)
         try:
