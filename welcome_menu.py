@@ -240,6 +240,7 @@ async def welcome_menu_callback(update: Update, context: ContextTypes.DEFAULT_TY
     elif step == "example_skip":
         log_event("example_skip", chat_id=chat_id)
         from bot import start  # или корректно импортируй из bot
+        await context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
         await start(update, context)
         context.user_data["welcome_step"] = "hello"
     else:
