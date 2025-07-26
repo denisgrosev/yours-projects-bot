@@ -798,6 +798,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown"
             )
 
+    else:
+        # Если и message, и callback_query отсутствуют (например, после example_skip)
+        await safe_send_and_store(
+            context,
+            update.effective_chat.id,
+            text,
+            reply_markup=MAIN_MENU,
+            parse_mode="Markdown"
+        )
+
     return ConversationHandler.END
 
 
