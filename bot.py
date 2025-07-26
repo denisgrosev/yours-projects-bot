@@ -749,59 +749,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "conversation" in key:
             del context.chat_data[key]
 
-
-
-
+    
     context.chat_data.clear()
-
+    
     # Приветствие и меню
     if update.message:
-        await safe_send_and_store(
-            context,
-            update.effective_chat.id,
-            text,
-            reply_markup=MAIN_MENU,
-            parse_mode="Markdown"
-        )
-
+        await safe_send_and_store(context, update.effective_chat.id, text, reply_markup=MAIN_MENU, parse_mode="Markdown")
     elif update.callback_query:
         await update.callback_query.answer()
-
-        message = update.callback_query.message
-
-        if message and getattr(message, "message_id", None):
-            try:
-                await safe_edit_and_store(
-                    context,
-                    update.effective_chat.id,
-                    message.message_id,
-                    text,
-                    reply_markup=MAIN_MENU,
-                    parse_mode="Markdown"
-                )
-            except Exception as e:
-                logger.warning(f"Не удалось отредактировать сообщение: {e}")
-                await safe_send_and_store(
-                    context,
-                    update.effective_chat.id,
-                    text,
-                    reply_markup=MAIN_MENU,
-                    parse_mode="Markdown"
-                )
-        else:
-            # Сообщение уже было удалено (например, кнопкой "Пропустить")
-            await safe_send_and_store(
-                context,
-                update.effective_chat.id,
-                text,
-                reply_markup=MAIN_MENU,
-                parse_mode="Markdown"
-            )
-
+        await safe_edit_and_store(
+            context,
+            update.effective_chat.id,
+            update.callback_query.message.message_id,
+            text,
+            reply_markup=MAIN_MENU,
+            parse_mode="Markdown"   # <--- вот это!
+        )
     return ConversationHandler.END
-
-
-
 
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await start(update, context)
@@ -1286,7 +1250,7 @@ def main():
         ],
     )
 
-    application.add_handler(CallbackQueryHandler(welcome_menu_callback, pattern="^(welcome_|example_)"))
+    application.add_handler(CallbackQueryHandler(welcome_menu_callback, pattern="^welcome_"))
     application.add_handler(CommandHandler("start", start))
     application.add_handler(topup_conv)
     application.add_handler(new_proj_conv)
