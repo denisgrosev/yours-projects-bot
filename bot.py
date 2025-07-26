@@ -1250,7 +1250,7 @@ def main():
         ],
     )
 
-    application.add_handler(CallbackQueryHandler(welcome_menu_callback, pattern="^welcome_"))
+    application.add_handler(CallbackQueryHandler(welcome_menu_callback, pattern="^(welcome_|example_)"))
     application.add_handler(CommandHandler("start", start))
     application.add_handler(topup_conv)
     application.add_handler(new_proj_conv)
