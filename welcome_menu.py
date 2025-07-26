@@ -118,11 +118,9 @@ async def show_example_page(context, chat_id, page=1, edit=False, message_id=Non
 
     need_new_file = False
 
-    # Для редактирования нужен message_id
     if file_id:
         try:
             if edit and message_id is not None:
-                # Редактируем существующее сообщение
                 await context.bot.edit_message_media(
                     media=InputMediaPhoto(media=file_id, caption=caption),
                     chat_id=chat_id,
@@ -132,7 +130,6 @@ async def show_example_page(context, chat_id, page=1, edit=False, message_id=Non
                 log_event("edit_message_media_by_file_id_success", chat_id=chat_id, file_id=file_id, page=page)
                 return None
             else:
-                # Первый показ — новое сообщение, сохраняем message_id
                 msg = await context.bot.send_photo(chat_id=chat_id, photo=file_id, caption=caption, reply_markup=get_example_keyboard(page))
                 log_event("send_photo_by_file_id_success", chat_id=chat_id, file_id=file_id, page=page)
                 return msg
@@ -158,12 +155,10 @@ async def show_example_page(context, chat_id, page=1, edit=False, message_id=Non
                         reply_markup=get_example_keyboard(page)
                     )
                     log_event("edit_message_media_by_file_success", chat_id=chat_id, file_path=file_path, page=page)
-                    # Получить file_id в этом случае нельзя!
                     return None
                 else:
                     msg = await context.bot.send_photo(chat_id=chat_id, photo=photo, caption=caption, reply_markup=get_example_keyboard(page))
                     log_event("send_photo_by_file_success", chat_id=chat_id, file_path=file_path, page=page)
-                    # Сохраняем file_id для будущих отправок
                     try:
                         new_file_id = (msg.photo[-1].file_id if hasattr(msg, "photo") and msg.photo else None)
                     except Exception as e:
@@ -219,7 +214,13 @@ async def welcome_menu_callback(update: Update, context: ContextTypes.DEFAULT_TY
         log_event("start_example", chat_id=chat_id)
         context.user_data["welcome_step"] = "example"
         context.user_data["example_page"] = 1
-        # ОТПРАВЛЯЕМ ПЕРВОЕ ФОТО и сохраняем message_id для дальнейших редактирований
+        # Удаляем сообщение с рефералкой
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
+            log_event("ref_message_deleted", chat_id=chat_id, msg_id=query.message.message_id)
+        except Exception as e:
+            log_event("ref_message_delete_error", chat_id=chat_id, msg_id=query.message.message_id, error=str(e))
+        # Отправляем первое фото с примером работы и сохраняем message_id для дальнейших редактирований
         msg = await show_example_page(context, chat_id, page=1, edit=False, message_id=None)
         if msg:
             context.user_data["example_message_id"] = msg.message_id
