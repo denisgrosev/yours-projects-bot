@@ -98,6 +98,24 @@ def safe_soffice_convert(docx_path, pdf_path):
             print(f"Неожиданная ошибка: {ex}")
             time.sleep(30)
 
+def make_doc_filename(
+    fio: str,
+    topic: str,
+    user_id: int,
+    timestamp: str,
+    max_bytes: int = 180
+) -> str:
+    safe_fio = sanitize_filename(fio)
+    safe_topic = sanitize_filename(topic)
+
+    pretty_name = f"{safe_fio}. {safe_topic}.{timestamp}.docx"
+
+    # считаем БАЙТЫ, а не символы
+    if len(pretty_name.encode("utf-8")) > max_bytes:
+        return f"project_{user_id}_{timestamp}.docx"
+
+    return pretty_name
+
 def sanitize_filename(text):
     forbidden_chars = '/\\:*?"<>|'
     for char in forbidden_chars:
@@ -479,22 +497,28 @@ async def main():
         output_buffer = BytesIO()
         doc.save(output_buffer)
         output_buffer.seek(0)
-
-        safe_fio = sanitize_filename(user_data['fio_student'])
-        safe_theme = sanitize_filename(user_data['topic'])
-        doc_filename = os.path.join(output_dir, f"{safe_fio}. {safe_theme}.{timestamp}.docx")
+        
+        filename = make_doc_filename(
+            fio=user_data["fio_student"],
+            topic=user_data["topic"],
+            user_id=user_id,
+            timestamp=timestamp
+        )
+        
+        doc_filename = os.path.join(output_dir, filename)
         logger.info(f"Сохраняем финальный docx на диск: {doc_filename}")
         doc.save(doc_filename)
+        
         project_copy_path = os.path.join(PROJECTS_DIR, os.path.basename(doc_filename))
         shutil.copyfile(doc_filename, project_copy_path)
         logger.info(f"Проект продублирован в: {project_copy_path}")
-
+        
         await safe_send_message(bot, user_id, "Проект успешно создан! Документ отправлен в чат.")
-        logger.info(f"Отправляем документ пользователю {user_id} через Telegram")
+        
         await bot.send_document(
             user_id,
-            InputFile(output_buffer, filename=f"{safe_fio}. {safe_theme}.{timestamp}.docx"),
-            caption="Спасибо за покупку, оставьте отзыв :З @rewiew_of_project"
+            InputFile(output_buffer, filename=filename),
+            caption="Спасибо за покупку :З"
         )
     except Exception as e:
         logger.error(f"Exception в генераторе: {e}", exc_info=True)
@@ -506,3 +530,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
