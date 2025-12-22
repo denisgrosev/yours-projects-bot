@@ -1117,7 +1117,7 @@ async def new_teacher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         save_user_hint(user_id, "fio_teacher", fio_teacher)
         await safe_send_and_store(
             context, update.effective_chat.id,
-            "Введи количество разделов. 1 раздел",
+            "Введи количество разделов проекта. 1 раздел = 20 ₽ (~1,5 страницы текста)",
             reply_markup=make_hint_keyboard("num_points", user_id, BACK_TO_MENU_BTN)
         )
         return NEW_POINTS
@@ -1342,3 +1342,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
